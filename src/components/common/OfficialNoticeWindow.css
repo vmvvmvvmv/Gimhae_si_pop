@@ -1,0 +1,299 @@
+.official-notice-backdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(20 45 58 / 45%);
+  backdrop-filter: blur(3px);
+}
+
+.official-notice-window {
+  display: grid;
+  width: min(980px, 100%);
+  max-height: min(860px, calc(100vh - 48px));
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 3px solid #2d2d2d;
+  border-radius: 22px 10px 20px 12px;
+  background: #fdfbf7;
+  box-shadow: 8px 8px 0 #2d2d2d;
+}
+
+.official-notice-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 26px 28px 20px;
+  border-bottom: 3px dashed #e5e0d8;
+  background: #fff;
+}
+
+.official-notice-eyebrow {
+  color: #2d5da1;
+  font-family: Pretendard, 'Noto Sans KR', sans-serif;
+  font-size: 17px;
+  letter-spacing: 0.04em;
+}
+
+.official-notice-header h2 {
+  margin: 4px 0 5px;
+  color: #2d2d2d;
+  font-family: Pretendard, 'Noto Sans KR', sans-serif;
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 1.08;
+}
+
+.official-notice-header p {
+  margin: 0;
+  color: #6c625b;
+  font-family: Pretendard, 'Noto Sans KR', sans-serif;
+  font-size: 16px;
+}
+
+.official-notice-close {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 2px solid #2d2d2d;
+  border-radius: 12px 4px 10px 5px;
+  color: #2d2d2d;
+  background: #fff4f0;
+  box-shadow: 3px 3px 0 #e5e0d8;
+  font-family: Pretendard, 'Noto Sans KR', sans-serif;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.official-notice-close:hover,
+.official-notice-footer button:hover {
+  color: #fff;
+  background: #ff4d4d;
+  box-shadow: 3px 3px 0 #2d2d2d;
+}
+
+.official-notice-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 16px 28px;
+  border-bottom: 1px dashed #d6d0c8;
+}
+
+.official-notice-summary > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 2px solid #2d2d2d;
+  border-radius: 12px 5px 11px 6px;
+  padding: 10px 13px;
+  background: #fff9c4;
+  box-shadow: 2px 2px 0 #e5e0d8;
+}
+
+.official-notice-summary > div.verified { background: #e9f1fb; }
+.official-notice-summary > div.unverified { background: #f4f1ea; }
+
+.official-notice-summary small,
+.official-notice-summary strong,
+.official-notice-tools,
+.official-notice-item,
+.official-notice-footer {
+  font-family: Pretendard, 'Noto Sans KR', sans-serif;
+}
+
+.official-notice-summary small {
+  color: #6c625b;
+  font-size: 14px;
+}
+
+.official-notice-summary strong {
+  color: #2d2d2d;
+  font-size: 21px;
+}
+
+.official-notice-tools {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  padding: 14px 28px;
+  border-bottom: 1px dashed #d6d0c8;
+  background: #fff;
+}
+
+.official-notice-search,
+.official-notice-type-filter {
+  display: grid;
+  gap: 5px;
+}
+
+.official-notice-search { flex: 1; }
+
+.official-notice-tools label > span {
+  color: #2d5da1;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.official-notice-tools input,
+.official-notice-tools select {
+  min-height: 40px;
+  border: 2px solid #2d2d2d;
+  border-radius: 10px 4px 9px 5px;
+  padding: 7px 10px;
+  color: #2d2d2d;
+  background: #fff;
+  font: inherit;
+  font-size: 15px;
+}
+
+.official-notice-tools input:focus,
+.official-notice-tools select:focus,
+.official-notice-close:focus-visible,
+.official-notice-footer button:focus-visible,
+.official-notice-title:focus-visible {
+  outline: 3px solid rgb(45 93 161 / 30%);
+  outline-offset: 2px;
+}
+
+.official-notice-type-filter {
+  width: 190px;
+  flex: 0 0 auto;
+}
+
+.official-notice-list {
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 28px 20px;
+}
+
+.official-notice-item {
+  display: grid;
+  gap: 7px;
+  border-bottom: 2px dashed #e5e0d8;
+  padding: 15px 4px 16px;
+}
+
+.official-notice-item:first-child { padding-top: 4px; }
+
+.official-notice-item-heading,
+.official-notice-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.official-notice-item-heading {
+  color: #6c625b;
+  font-size: 13px;
+}
+
+.official-notice-type {
+  border: 1px solid #6aafe2;
+  border-radius: 999px;
+  padding: 2px 8px;
+  color: #1f4058;
+  background: #eaf5ff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.official-notice-title {
+  color: #1f4058;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.45;
+  text-decoration: underline;
+  text-decoration-color: #6aafe2;
+  text-underline-offset: 4px;
+}
+
+.official-notice-title.is-unverified {
+  color: #5f5a55;
+  text-decoration: none;
+}
+
+.official-notice-item p {
+  margin: 0;
+  color: #456276;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.official-notice-item-meta {
+  color: #77736d;
+  font-size: 12px;
+}
+
+.official-notice-item-meta span + span::before {
+  margin-right: 12px;
+  color: #c2bbb2;
+  content: '·';
+}
+
+.official-notice-item-meta .link-verified {
+  color: #2d5da1;
+  font-weight: 700;
+}
+
+.official-notice-item-meta .link-unverified { color: #a36b22; }
+
+.official-notice-empty {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  margin: 0;
+  color: #6c625b;
+  font-family: Pretendard, 'Noto Sans KR', sans-serif;
+  font-size: 17px;
+  text-align: center;
+}
+
+.official-notice-empty.error { color: #d64242; }
+
+.official-notice-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 28px 15px;
+  border-top: 2px dashed #d6d0c8;
+  color: #77736d;
+  background: #fff;
+  font-size: 12px;
+}
+
+.official-notice-footer button {
+  flex: 0 0 auto;
+  border: 2px solid #2d2d2d;
+  border-radius: 10px 4px 9px 5px;
+  padding: 7px 13px;
+  color: #2d2d2d;
+  background: #fff;
+  font: inherit;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .official-notice-backdrop { padding: 10px; }
+  .official-notice-window {
+    max-height: calc(100vh - 20px);
+    box-shadow: 5px 5px 0 #2d2d2d;
+  }
+  .official-notice-header,
+  .official-notice-summary,
+  .official-notice-tools,
+  .official-notice-list,
+  .official-notice-footer { padding-right: 16px; padding-left: 16px; }
+  .official-notice-summary { grid-template-columns: 1fr; gap: 7px; }
+  .official-notice-tools { align-items: stretch; flex-direction: column; }
+  .official-notice-type-filter { width: auto; }
+  .official-notice-footer { align-items: stretch; flex-direction: column; }
+  .official-notice-footer button { width: 100%; }
+}
