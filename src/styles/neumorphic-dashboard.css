@@ -1,0 +1,156 @@
+.dashboard-page {
+  --neo-surface: #e9eef5;
+  --neo-dark-shadow: #cbd3df;
+  --neo-light-shadow: #ffffff;
+  --neo-ink: #3f4d68;
+  --neo-muted: #7b879b;
+  --neo-accent: #78a9bd;
+  background: var(--neo-surface);
+  color: var(--neo-ink);
+}
+
+.dashboard-header h1,
+.card-heading h2,
+.detail-heading h2,
+.comparison-table-heading h2 {
+  color: var(--neo-ink);
+  letter-spacing: -0.06em;
+}
+
+.dashboard-header p:last-child {
+  color: var(--neo-muted);
+}
+
+.boundary-switch,
+.filter-card,
+.map-card,
+.detail-card,
+.comparison-table-card {
+  border: 0;
+  background: var(--neo-surface);
+  box-shadow:
+    12px 12px 24px var(--neo-dark-shadow),
+    -12px -12px 24px var(--neo-light-shadow);
+}
+
+.boundary-switch {
+  padding: 6px;
+}
+
+.boundary-switch button.active {
+  color: #4a7890;
+  background: #e9eef5;
+  box-shadow:
+    inset 4px 4px 8px var(--neo-dark-shadow),
+    inset -4px -4px 8px var(--neo-light-shadow);
+}
+
+.filter-card {
+  padding: 18px 20px;
+}
+
+.search-input-wrap input,
+.filter-field select,
+.comparison-sort select {
+  border: 0;
+  background: var(--neo-surface);
+  box-shadow:
+    inset 4px 4px 9px var(--neo-dark-shadow),
+    inset -4px -4px 9px var(--neo-light-shadow);
+}
+
+.search-input-wrap input:focus,
+.filter-field select:focus,
+.comparison-sort select:focus {
+  outline: 2px solid rgb(120 169 189 / 45%);
+  border-color: transparent;
+}
+
+.map-card,
+.detail-card,
+.comparison-table-card {
+  overflow: hidden;
+}
+
+.card-heading,
+.detail-heading,
+.comparison-table-heading {
+  border-bottom: 0;
+}
+
+.map-wrapper {
+  margin: 0 12px 12px;
+  overflow: hidden;
+  min-height: 470px;
+  border-radius: 18px;
+  box-shadow:
+    inset 5px 5px 12px rgb(157 171 189 / 38%),
+    inset -5px -5px 12px rgb(255 255 255 / 74%);
+}
+
+.naver-map {
+  border-radius: 18px;
+}
+
+.detail-card {
+  padding: 24px;
+}
+
+.stat-grid div,
+.comparison-grid div {
+  border: 0;
+  background: var(--neo-surface);
+  box-shadow:
+    5px 5px 10px var(--neo-dark-shadow),
+    -5px -5px 10px var(--neo-light-shadow);
+}
+
+.stat-grid strong {
+  color: #5d91a9;
+}
+
+.comparison-grid div {
+  border: 0;
+  background: #e8edf3;
+}
+
+.comparison-grid strong {
+  color: #8b6c70;
+}
+
+.area-note {
+  color: #8b8791;
+}
+
+.comparison-table-wrap {
+  padding: 0 12px 12px;
+}
+
+.comparison-table {
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--neo-surface);
+  box-shadow:
+    inset 4px 4px 10px var(--neo-dark-shadow),
+    inset -4px -4px 10px var(--neo-light-shadow);
+}
+
+.comparison-table thead th {
+  background: transparent;
+}
+
+.comparison-table tbody tr:hover {
+  background: rgb(255 255 255 / 35%);
+}
+
+@media (max-width: 820px) {
+  .dashboard-page {
+    padding-top: 28px;
+  }
+
+  .map-wrapper {
+    margin-right: 8px;
+    margin-left: 8px;
+    min-height: 430px;
+  }
+}
