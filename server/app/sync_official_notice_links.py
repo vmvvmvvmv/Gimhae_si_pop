@@ -2,7 +2,9 @@
 
 import argparse
 import asyncio
+import math
 import re
+import ssl
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from urllib.parse import parse_qs, urlencode, urljoin, urlparse
@@ -17,7 +19,21 @@ from .models import DevelopmentNotice
 OFFICIAL_LIST_URL = "https://www.gimhae.go.kr/03360/00023/00029.web"
 EUM_LIST_URL = "https://www.eum.go.kr/web/gs/gv/gvGosiList.jsp"
 EUM_DETAIL_URL = "https://www.eum.go.kr/web/gs/gv/gvGosiDet.jsp"
-OFFICIAL_URL_MARKERS = ("not_ancmt_mgt_no=", "/web/gs/gv/gvGosiDet.jsp?seq=")
+GYEONGNAM_BASE_URL = "https://minwon.gyeongnam.go.kr"
+GYEONGNAM_NOTICE_PATH = "/citynet/jsp/sap/SAPGosiBizProcess.do"
+GYEONGNAM_LIST_URL = (
+    f"{GYEONGNAM_BASE_URL}{GYEONGNAM_NOTICE_PATH}"
+    "?command=searchList&flag=gosiGL&svp=Y&sido="
+)
+GYEONGNAM_TOKEN_URL = (
+    f"{GYEONGNAM_BASE_URL}{GYEONGNAM_NOTICE_PATH}"
+    "?command=searchDetail&flag=gosiGL&gosiGbn=N&sno=55047&svp=Y"
+)
+OFFICIAL_URL_MARKERS = (
+    "not_ancmt_mgt_no=",
+    "/web/gs/gv/gvGosiDet.jsp?seq=",
+    "minwon.gyeongnam.go.kr/citynet/jsp/sap/SAPGosiBizProcess.do?command=searchDetail",
+)
 
 
 @dataclass(frozen=True)
@@ -235,6 +251,107 @@ def parse_eum_candidates(page_html: str) -> list[OfficialCandidate]:
                 ),
             )
     return candidates
+
+
+class GyeongnamNoticeSearchParser(HTMLParser):
+    """경상남도 구형 고시·공고 목록의 표 행을 읽습니다."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.rows: list[tuple[str, list[str]]] = []
+        self.current_sno = ""
+        self.current_cells: list[str] | None = None
+        self.current_cell_index: int | None = None
+
+    def handle_starttag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        attributes = dict(attrs)
+        if tag == "tr":
+            match = re.search(
+                r"viewData\('([0-9]+)'\s*,\s*'N'\)",
+                attributes.get("onclick") or "",
+            )
+            if match:
+                self.current_sno = match.group(1)
+                self.current_cells = []
+                self.current_cell_index = None
+            return
+        if tag == "td" and self.current_cells is not None:
+            self.current_cells.append("")
+            self.current_cell_index = len(self.current_cells) - 1
+
+    def handle_data(self, data: str) -> None:
+        if self.current_cells is not None and self.current_cell_index is not None:
+            self.current_cells[self.current_cell_index] += data
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "td":
+            self.current_cell_index = None
+        elif tag == "tr" and self.current_cells is not None:
+            self.rows.append((self.current_sno, self.current_cells))
+            self.current_sno = ""
+            self.current_cells = None
+            self.current_cell_index = None
+
+
+def canonical_gyeongnam_url(sno: str) -> str:
+    if not sno.isdigit():
+        return ""
+    return (
+        f"{GYEONGNAM_BASE_URL}{GYEONGNAM_NOTICE_PATH}"
+        f"?command=searchDetail&flag=gosiGL&gosiGbn=N&sno={sno}&svp=Y"
+    )
+
+
+def parse_gyeongnam_candidates(page_html: str) -> list[OfficialCandidate]:
+    parser = GyeongnamNoticeSearchParser()
+    parser.feed(page_html)
+    candidates: list[OfficialCandidate] = []
+    for sno, cells in parser.rows:
+        if len(cells) < 4:
+            continue
+        notice_number = " ".join(cells[0].split())
+        title = " ".join(cells[1].split())
+        notice_date = " ".join(cells[3].split())
+        official_url = canonical_gyeongnam_url(sno)
+        if official_url and notice_number and title and notice_date:
+            candidates.append(
+                OfficialCandidate(
+                    url=official_url,
+                    notice_number=notice_number,
+                    notice_date=notice_date,
+                    title=title,
+                    organization_name="경상남도",
+                ),
+            )
+    return candidates
+
+
+def system_ssl_context() -> ssl.SSLContext:
+    """기본 CA와 Windows 시스템 신뢰 저장소를 함께 사용합니다."""
+    context = ssl.create_default_context()
+    if not hasattr(ssl, "enum_certificates"):
+        return context
+    for certificate, encoding, _ in ssl.enum_certificates("ROOT"):
+        if encoding != "x509_asn":
+            continue
+        try:
+            context.load_verify_locations(
+                cadata=ssl.DER_cert_to_PEM_cert(certificate),
+            )
+        except ssl.SSLError:
+            continue
+    return context
+
+
+def extract_sync_token(page_html: str) -> str:
+    match = re.search(r'name="TOKEN_SAB" value="([^"]+)"', page_html)
+    if not match:
+        raise RuntimeError("경상남도 고시 검색 토큰을 찾지 못했습니다.")
+    return match.group(1)
 
 
 def normalize_organization(value: str) -> str:
@@ -463,10 +580,97 @@ async def collect_eum_catalog_matches(
     ]
 
 
+async def collect_gyeongnam_catalog_matches(
+    notices: list[NoticeSnapshot],
+    *,
+    concurrency: int,
+    delay_seconds: float,
+) -> list[MatchResult]:
+    """경상남도 공식 고시 중 제목에 김해가 있는 목록을 일괄 대조합니다."""
+    del concurrency  # 동기화 토큰이 요청마다 바뀌므로 순차 조회합니다.
+    if not notices:
+        return []
+
+    from_date = min(notice.notice_date for notice in notices)
+    to_date = max(notice.notice_date for notice in notices)
+    headers = {
+        "Accept": "text/html,application/xhtml+xml",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 Chrome/140 Safari/537.36"
+        ),
+    }
+    async with httpx.AsyncClient(
+        headers=headers,
+        follow_redirects=True,
+        timeout=60,
+        verify=system_ssl_context(),
+    ) as client:
+        bootstrap = await client.get(GYEONGNAM_TOKEN_URL)
+        bootstrap.raise_for_status()
+        token = extract_sync_token(
+            bootstrap.content.decode("euc-kr", errors="replace"),
+        )
+        candidates: list[OfficialCandidate] = []
+        page = 1
+        total_pages = 1
+        while page <= total_pages:
+            if delay_seconds:
+                await asyncio.sleep(delay_seconds)
+            body = urlencode(
+                {
+                    "TOKEN_SAB": token,
+                    "appCode": "",
+                    "rescCode": "",
+                    "flag": "gosiGL",
+                    "gosiGbn": "N",
+                    "conGosiGbn": "N",
+                    "conAnnounceNo": "",
+                    "conTitle": "김해".encode("euc-kr"),
+                    "conIfmStdt": from_date,
+                    "conIfmEnddt": to_date,
+                    "conIfmStdt_Date": from_date.replace("-", ""),
+                    "conIfmEnddt_Date": to_date.replace("-", ""),
+                    "conDeptCode": "",
+                    "conDeptNm": "",
+                    "currPageNo": str(page),
+                },
+            )
+            response = await client.post(GYEONGNAM_LIST_URL, content=body)
+            response.raise_for_status()
+            page_html = response.content.decode("utf-8", errors="replace")
+            token = extract_sync_token(page_html)
+            if page == 1:
+                total_match = re.search(r"총\s*([0-9,]+)건", page_html)
+                total_count = int(total_match.group(1).replace(",", "")) \
+                    if total_match else 0
+                total_pages = max(1, math.ceil(total_count / 10))
+                print(
+                    f"경상남도 '김해' 고시 목록: {from_date}~{to_date}, "
+                    f"{total_count}건, {total_pages}페이지"
+                )
+            candidates.extend(parse_gyeongnam_candidates(page_html))
+            if page % 5 == 0 or page == total_pages:
+                print(f"경상남도 목록 수집: {page}/{total_pages}페이지")
+            page += 1
+
+    print(f"경상남도 공식 고시 후보: {len(candidates)}건")
+    return [
+        MatchResult(
+            source_id=notice.source_id,
+            official_url=(candidate.url if candidate else None),
+        )
+        for notice in notices
+        for candidate in [choose_exact_candidate(notice, candidates)]
+    ]
+
+
 def load_notices(
     *,
     limit: int | None,
     notice_number: str | None,
+    organization_name: str | None,
     refresh: bool,
 ) -> list[NoticeSnapshot]:
     with SessionLocal() as db:
@@ -476,6 +680,10 @@ def load_notices(
         if notice_number:
             statement = statement.where(
                 DevelopmentNotice.notice_number == notice_number,
+            )
+        if organization_name:
+            statement = statement.where(
+                DevelopmentNotice.organization_name == organization_name,
             )
         if not refresh:
             statement = statement.where(
@@ -532,6 +740,10 @@ def main() -> None:
     )
     parser.add_argument("--limit", type=int)
     parser.add_argument("--notice-number")
+    parser.add_argument(
+        "--organization",
+        choices=("김해시", "경상남도", "국토교통부"),
+    )
     parser.add_argument("--concurrency", type=int, default=3)
     parser.add_argument("--delay-seconds", type=float, default=0.2)
     parser.add_argument("--refresh", action="store_true")
@@ -540,13 +752,19 @@ def main() -> None:
     notices = load_notices(
         limit=args.limit,
         notice_number=args.notice_number,
+        organization_name=args.organization,
         refresh=args.refresh,
     )
     if not notices:
         print("확인할 고시가 없습니다.")
         return
 
-    collector = collect_matches if args.notice_number else collect_eum_catalog_matches
+    if args.notice_number:
+        collector = collect_matches
+    elif args.organization == "경상남도":
+        collector = collect_gyeongnam_catalog_matches
+    else:
+        collector = collect_eum_catalog_matches
     results = asyncio.run(
         collector(
             notices,
