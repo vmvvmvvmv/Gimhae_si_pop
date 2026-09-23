@@ -8,6 +8,7 @@ from ..repositories.development_repository import get_development_notices
 
 OFFICIAL_NOTICE_PATH = "/03360/00023/00029.web"
 EUM_NOTICE_PATH = "/web/gs/gv/gvGosiDet.jsp"
+GYEONGNAM_NOTICE_PATH = "/citynet/jsp/sap/SAPGosiBizProcess.do"
 
 
 def verified_official_url(value: str) -> str:
@@ -24,6 +25,17 @@ def verified_official_url(value: str) -> str:
         parsed.netloc in {"www.eum.go.kr", "eum.go.kr"}
         and parsed.path == EUM_NOTICE_PATH
         and parse_qs(parsed.query).get("seq", [""])[0].isdigit()
+    ):
+        return value
+    query = parse_qs(parsed.query)
+    if (
+        parsed.netloc == "minwon.gyeongnam.go.kr"
+        and parsed.path == GYEONGNAM_NOTICE_PATH
+        and query.get("command", [""])[0] == "searchDetail"
+        and query.get("flag", [""])[0] == "gosiGL"
+        and query.get("gosiGbn", [""])[0] == "N"
+        and query.get("sno", [""])[0].isdigit()
+        and query.get("svp", [""])[0] == "Y"
     ):
         return value
     return ""

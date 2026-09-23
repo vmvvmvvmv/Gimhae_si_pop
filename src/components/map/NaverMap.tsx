@@ -130,9 +130,11 @@ function renderDevelopmentNotices(notices: DevelopmentNotice[]): string {
           if (notice.sourceUrl) {
             try {
               const hostname = new URL(notice.sourceUrl).hostname
-              linkStatus = hostname.endsWith('eum.go.kr')
-                ? '토지이음 공식 고시 원문'
-                : '김해시청 공식 고시공고'
+              linkStatus = hostname === 'minwon.gyeongnam.go.kr'
+                ? '경상남도 공식 고시 원문'
+                : hostname.endsWith('eum.go.kr')
+                  ? '토지이음 공식 고시 원문'
+                  : '김해시청 공식 고시공고'
             } catch {
               linkStatus = '공식 원문 링크 미확인'
             }
