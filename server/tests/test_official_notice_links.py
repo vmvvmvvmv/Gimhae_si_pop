@@ -1,11 +1,13 @@
 import unittest
 
 from app.sync_official_notice_links import (
+    OfficialCandidate,
     NoticeSnapshot,
     choose_exact_candidate,
     parse_eum_candidates,
     parse_gyeongnam_candidates,
 )
+from app.audit_official_notice_mismatches import classify_notice
 
 
 EUM_LIST_SAMPLE = """
@@ -73,6 +75,42 @@ class OfficialNoticeLinkTests(unittest.TestCase):
             "gosiGbn=N&sno=55047&svp=Y",
         )
         self.assertEqual(choose_exact_candidate(self.notice, candidates), candidates[0])
+
+    def test_audit_classifies_each_mismatch_without_relaxing_match(self):
+        exact = parse_eum_candidates(EUM_LIST_SAMPLE)[0]
+        cases = (
+            (exact, "exact_match"),
+            (
+                OfficialCandidate(**{**exact.__dict__, "notice_date": "2026-07-29"}),
+                "date_mismatch",
+            ),
+            (
+                OfficialCandidate(**{**exact.__dict__, "title": "서로 다른 제목"}),
+                "title_mismatch",
+            ),
+            (
+                OfficialCandidate(
+                    **{
+                        **exact.__dict__,
+                        "notice_date": "2026-07-29",
+                        "title": "서로 다른 제목",
+                    },
+                ),
+                "date_and_title_mismatch",
+            ),
+            (
+                OfficialCandidate(**{**exact.__dict__, "organization_name": "김해시"}),
+                "organization_mismatch",
+            ),
+        )
+        for candidate, expected in cases:
+            with self.subTest(expected=expected):
+                self.assertEqual(
+                    classify_notice(self.notice, [candidate]).reason,
+                    expected,
+                )
+
+        self.assertEqual(classify_notice(self.notice, []).reason, "no_number_candidate")
 
 
 if __name__ == "__main__":
