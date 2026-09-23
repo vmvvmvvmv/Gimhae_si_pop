@@ -24,6 +24,13 @@ function getOfficialSourceLabel(notice: DevelopmentNotice) {
       url.pathname === '/web/gs/gv/gvGosiDet.jsp' &&
       /^\d+$/.test(url.searchParams.get('seq') ?? '')
     ) return '토지이음 원문'
+    if (
+      url.protocol === 'https:' &&
+      url.hostname === 'minwon.gyeongnam.go.kr' &&
+      url.pathname === '/citynet/jsp/sap/SAPGosiBizProcess.do' &&
+      url.searchParams.get('command') === 'searchDetail' &&
+      /^\d+$/.test(url.searchParams.get('sno') ?? '')
+    ) return '경상남도 원문'
     return ''
   } catch {
     return ''

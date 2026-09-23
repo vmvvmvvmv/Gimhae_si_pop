@@ -117,6 +117,15 @@ cd /d C:\Users\User\Documents\ChatGPT\Gimhae_si_Map\server
 ```
 
 한 건만 다시 검증하려면 `--notice-number 2026-200 --refresh`를 붙입니다.
+남은 경상남도 고시만 공식 도청 게시판과 대조하려면 다음처럼 실행합니다.
+
+```text
+.venv\Scripts\python.exe -m app.sync_official_notice_links --organization 경상남도 --delay-seconds 0.2
+```
+
+경상남도 게시판은 동기화 토큰을 순서대로 갱신해야 하므로 병렬 요청을 하지
+않습니다. 제목에 `김해`가 포함된 공식 고시 목록을 먼저 수집한 뒤 DB에서
+번호·날짜·제목을 정확히 대조합니다.
 
 유동·주거인구 CSV는 먼저 미리보기로 열 구조와 지역 코드 일치 여부를 확인한
 후 SQLite에 저장합니다. 아래 명령의 CSV 경로는 실제 다운로드 파일 경로로
