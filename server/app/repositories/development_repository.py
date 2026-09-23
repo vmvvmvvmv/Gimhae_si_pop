@@ -64,6 +64,7 @@ def upsert_development_notices(
                 for marker in (
                     "not_ancmt_mgt_no=",
                     "/web/gs/gv/gvGosiDet.jsp?seq=",
+                    "minwon.gyeongnam.go.kr/citynet/jsp/sap/SAPGosiBizProcess.do?command=searchDetail",
                 )
             )
         ):

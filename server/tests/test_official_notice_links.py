@@ -4,6 +4,7 @@ from app.sync_official_notice_links import (
     NoticeSnapshot,
     choose_exact_candidate,
     parse_eum_candidates,
+    parse_gyeongnam_candidates,
 )
 
 
@@ -15,6 +16,18 @@ EUM_LIST_SAMPLE = """
   <td><a href="gvGosiDet.jsp?seq=638912&amp;gosino=2026-369"
     title="김해 풍유일반물류단지 지정 해제, 사업시행자 지정 취소 및 지형도면 고시">원문</a></td>
   <td title="경상남도">경상남도</td>
+</tr>
+</tbody></table>
+"""
+
+GYEONGNAM_LIST_SAMPLE = """
+<table><tbody>
+<tr onclick="viewData('55047','N')">
+  <td class="d_tb_center">2026-369</td>
+  <td class="d_tb_left">김해 풍유일반물류단지 지정 해제, 사업시행자 지정 취소 및 지형도면 고시</td>
+  <td class="d_tb_left">교통건설국 물류공항철도과</td>
+  <td class="d_tb_center">2026-07-30</td>
+  <td class="d_tb_center">3</td>
 </tr>
 </tbody></table>
 """
@@ -49,6 +62,17 @@ class OfficialNoticeLinkTests(unittest.TestCase):
         ):
             with self.subTest(changed=changed):
                 self.assertIsNone(choose_exact_candidate(changed, [candidate]))
+
+    def test_gyeongnam_list_parser_builds_stable_detail_url(self):
+        candidates = parse_gyeongnam_candidates(GYEONGNAM_LIST_SAMPLE)
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(
+            candidates[0].url,
+            "https://minwon.gyeongnam.go.kr/citynet/jsp/sap/"
+            "SAPGosiBizProcess.do?command=searchDetail&flag=gosiGL&"
+            "gosiGbn=N&sno=55047&svp=Y",
+        )
+        self.assertEqual(choose_exact_candidate(self.notice, candidates), candidates[0])
 
 
 if __name__ == "__main__":
