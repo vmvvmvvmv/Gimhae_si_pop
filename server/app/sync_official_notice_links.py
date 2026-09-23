@@ -498,13 +498,13 @@ async def fetch_eum_catalog_page(
     return page_html, parse_eum_candidates(page_html)
 
 
-async def collect_eum_catalog_matches(
+async def collect_eum_catalog_candidates(
     notices: list[NoticeSnapshot],
     *,
     concurrency: int,
     delay_seconds: float,
-) -> list[MatchResult]:
-    """김해시 고시 목록을 페이지별로 받은 뒤 로컬에서 정확 대조합니다."""
+) -> list[OfficialCandidate]:
+    """김해시 지역의 토지이음 고시 목록을 페이지별로 수집합니다."""
     if not notices:
         return []
 
@@ -570,6 +570,21 @@ async def collect_eum_catalog_matches(
             raise
 
     print(f"토지이음 공식 고시 후보: {len(candidates)}건")
+    return candidates
+
+
+async def collect_eum_catalog_matches(
+    notices: list[NoticeSnapshot],
+    *,
+    concurrency: int,
+    delay_seconds: float,
+) -> list[MatchResult]:
+    """김해시 고시 목록을 페이지별로 받은 뒤 로컬에서 정확 대조합니다."""
+    candidates = await collect_eum_catalog_candidates(
+        notices,
+        concurrency=concurrency,
+        delay_seconds=delay_seconds,
+    )
     return [
         MatchResult(
             source_id=notice.source_id,
@@ -580,13 +595,13 @@ async def collect_eum_catalog_matches(
     ]
 
 
-async def collect_gyeongnam_catalog_matches(
+async def collect_gyeongnam_catalog_candidates(
     notices: list[NoticeSnapshot],
     *,
     concurrency: int,
     delay_seconds: float,
-) -> list[MatchResult]:
-    """경상남도 공식 고시 중 제목에 김해가 있는 목록을 일괄 대조합니다."""
+) -> list[OfficialCandidate]:
+    """경상남도 공식 고시 중 제목에 김해가 있는 목록을 수집합니다."""
     del concurrency  # 동기화 토큰이 요청마다 바뀌므로 순차 조회합니다.
     if not notices:
         return []
@@ -656,6 +671,21 @@ async def collect_gyeongnam_catalog_matches(
             page += 1
 
     print(f"경상남도 공식 고시 후보: {len(candidates)}건")
+    return candidates
+
+
+async def collect_gyeongnam_catalog_matches(
+    notices: list[NoticeSnapshot],
+    *,
+    concurrency: int,
+    delay_seconds: float,
+) -> list[MatchResult]:
+    """경상남도 공식 고시 중 제목에 김해가 있는 목록을 일괄 대조합니다."""
+    candidates = await collect_gyeongnam_catalog_candidates(
+        notices,
+        concurrency=concurrency,
+        delay_seconds=delay_seconds,
+    )
     return [
         MatchResult(
             source_id=notice.source_id,

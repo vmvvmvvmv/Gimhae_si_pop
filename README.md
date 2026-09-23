@@ -105,7 +105,7 @@ cd /d C:\Users\User\Documents\ChatGPT\Gimhae_si_Map\server
 명확히 일치할 때만 자동 연결하며, 범용 이름은 오연결을 막기 위해 연결하지
 않습니다. 저장 결과는 `GET /api/development/notices?limit=200`으로 확인합니다.
 
-UPIS 고시를 김해시청 또는 국토교통부 토지이음의 공식 고시 고유 URL과
+UPIS 고시를 김해시청·국토교통부 토지이음·경상남도청의 공식 고시 고유 URL과
 연결하려면 다음 명령을 실행합니다. 고시번호·고시일·제목·발행기관이 모두
 일치한 게시물만 저장하며, 확인되지 않은 자료에는 임의 링크를 만들지
 않습니다. 전체 실행은 토지이음의 김해시 목록을 페이지 단위로 받은 뒤
@@ -126,6 +126,14 @@ cd /d C:\Users\User\Documents\ChatGPT\Gimhae_si_Map\server
 경상남도 게시판은 동기화 토큰을 순서대로 갱신해야 하므로 병렬 요청을 하지
 않습니다. 제목에 `김해`가 포함된 공식 고시 목록을 먼저 수집한 뒤 DB에서
 번호·날짜·제목을 정확히 대조합니다.
+
+미연결 고시의 원인을 검토할 때는 아래 읽기 전용 점검 명령을 사용합니다.
+번호 후보 없음, 발행기관 불일치, 날짜 불일치, 제목 불일치로 분류한 요약과
+전체 CSV를 `server/data/reports/`에 만들며 DB는 수정하지 않습니다.
+
+```text
+.venv\Scripts\python.exe -m app.audit_official_notice_mismatches --concurrency 3 --delay-seconds 0.2
+```
 
 유동·주거인구 CSV는 먼저 미리보기로 열 구조와 지역 코드 일치 여부를 확인한
 후 SQLite에 저장합니다. 아래 명령의 CSV 경로는 실제 다운로드 파일 경로로

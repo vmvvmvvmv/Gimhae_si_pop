@@ -335,6 +335,9 @@ REM 하천·개발구역·시설
 REM UPIS 개발 고시와 검증된 발행기관 공식 원문 링크
 .venv\Scripts\python.exe -m app.sync_upis_development_notices --from-date 20000101 --to-date 20260921
 .venv\Scripts\python.exe -m app.sync_official_notice_links --concurrency 3 --delay-seconds 0.2
+
+REM 미연결 고시 원인 보고서(CSV·Markdown, DB 수정 없음)
+.venv\Scripts\python.exe -m app.audit_official_notice_mismatches --concurrency 3 --delay-seconds 0.2
 ```
 
 날짜 범위와 지연 시간은 실행 시점과 공공 API 정책에 맞춰 조정한다. 대량 호출은 서버 부담과 호출 제한을 고려해 지연 시간을 둔다.
@@ -365,7 +368,7 @@ REM UPIS 개발 고시와 검증된 발행기관 공식 원문 링크
 
 ## 14. 다음 작업 권장 순서
 
-1. 남은 공식 원문 501건의 제목·게시일 차이를 기관별로 검토하되, **정확 일치가 증명된 링크만** 보완한다.
+1. `app.audit_official_notice_mismatches`로 남은 공식 원문 501건을 점검한다. 결과는 `server/data/reports/`에 저장되며 번호 후보 없음·기관·날짜·제목 불일치로 구분된다. 이 명령은 DB를 수정하지 않으며, **정확 일치가 증명된 링크만** 별도 동기화한다.
 2. 원격 Git 이력을 확인한 뒤 로컬 첫 커밋과 병합·push하는 안전한 방법을 정한다. 강제 push는 하지 않는다.
 3. 행정동·법정동별 데이터 누락 월, 연령 데이터, 전국 비교 데이터를 자동 점검하는 검증 명령을 만든다.
 4. 프론트엔드와 백엔드 테스트를 추가한다. 특히 지역 코드 매칭, 비교월 계산, 레이어 클릭 순서, 공식 링크 검증을 우선한다.
