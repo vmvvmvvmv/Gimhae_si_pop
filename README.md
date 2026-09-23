@@ -105,9 +105,11 @@ cd /d C:\Users\User\Documents\ChatGPT\Gimhae_si_Map\server
 명확히 일치할 때만 자동 연결하며, 범용 이름은 오연결을 막기 위해 연결하지
 않습니다. 저장 결과는 `GET /api/development/notices?limit=200`으로 확인합니다.
 
-UPIS 고시를 김해시청 공식 고시공고 고유 URL과 연결하려면 다음 명령을
-실행합니다. 고시번호·등록일·제목이 모두 일치한 게시물만 저장하며, 확인되지
-않은 자료에는 임의 링크를 만들지 않습니다.
+UPIS 고시를 김해시청 또는 국토교통부 토지이음의 공식 고시 고유 URL과
+연결하려면 다음 명령을 실행합니다. 고시번호·고시일·제목·발행기관이 모두
+일치한 게시물만 저장하며, 확인되지 않은 자료에는 임의 링크를 만들지
+않습니다. 전체 실행은 토지이음의 김해시 목록을 페이지 단위로 받은 뒤
+로컬에서 대조합니다.
 
 ```text
 cd /d C:\Users\User\Documents\ChatGPT\Gimhae_si_Map\server

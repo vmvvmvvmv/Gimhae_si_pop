@@ -55,11 +55,17 @@ def upsert_development_notices(
         row.stage = str(item["stage"])
         row.stage_label = str(item["stage_label"])
         incoming_source_url = str(item["source_url"])
-        # 김해시청 공식 고시공고 고유 URL을 이미 찾은 경우, 이후 UPIS
-        # 재동기화가 일반 목록 주소로 되돌리지 않도록 보존합니다.
+        # 정확히 검증한 김해시청·토지이음 고유 URL을 이미 찾은 경우,
+        # 이후 UPIS 재동기화가 일반 목록 주소로 되돌리지 않도록 보존합니다.
         if (
             not row.source_url
-            or "not_ancmt_mgt_no=" not in row.source_url
+            or not any(
+                marker in row.source_url
+                for marker in (
+                    "not_ancmt_mgt_no=",
+                    "/web/gs/gv/gvGosiDet.jsp?seq=",
+                )
+            )
         ):
             row.source_url = incoming_source_url
         row.is_active = True
