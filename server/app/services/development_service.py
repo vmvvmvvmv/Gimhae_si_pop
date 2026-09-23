@@ -1,4 +1,4 @@
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from sqlalchemy.orm import Session
 
@@ -7,18 +7,26 @@ from ..repositories.development_repository import get_development_notices
 
 
 OFFICIAL_NOTICE_PATH = "/03360/00023/00029.web"
+EUM_NOTICE_PATH = "/web/gs/gv/gvGosiDet.jsp"
 
 
 def verified_official_url(value: str) -> str:
     parsed = urlparse(value)
-    if (
-        parsed.scheme != "https"
-        or parsed.netloc != "www.gimhae.go.kr"
-        or parsed.path != OFFICIAL_NOTICE_PATH
-        or "not_ancmt_mgt_no=" not in parsed.query
-    ):
+    if parsed.scheme != "https":
         return ""
-    return value
+    if (
+        parsed.netloc == "www.gimhae.go.kr"
+        and parsed.path == OFFICIAL_NOTICE_PATH
+        and "not_ancmt_mgt_no=" in parsed.query
+    ):
+        return value
+    if (
+        parsed.netloc in {"www.eum.go.kr", "eum.go.kr"}
+        and parsed.path == EUM_NOTICE_PATH
+        and parse_qs(parsed.query).get("seq", [""])[0].isdigit()
+    ):
+        return value
+    return ""
 
 
 def serialize_notice(row: DevelopmentNotice) -> dict[str, object]:
@@ -34,7 +42,7 @@ def serialize_notice(row: DevelopmentNotice) -> dict[str, object]:
         "stage": row.stage,
         "stageLabel": row.stage_label,
         "source": row.source,
-        # 정확히 대조된 김해시청 고시공고 고유 URL만 외부에 제공합니다.
+        # 번호·날짜·제목·발행기관을 대조한 공식 고유 URL만 제공합니다.
         "sourceUrl": verified_official_url(row.source_url),
     }
 

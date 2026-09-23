@@ -1,28 +1,32 @@
-"""UPIS 고시와 김해시청 공식 고시공고 고유 URL을 대조해 저장합니다."""
+"""UPIS 고시와 발행기관이 등재한 공식 고시 원문을 대조해 저장합니다."""
 
 import argparse
 import asyncio
 import re
 from dataclasses import dataclass
-from difflib import SequenceMatcher
 from html.parser import HTMLParser
 from urllib.parse import parse_qs, urlencode, urljoin, urlparse
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from .db import SessionLocal
 from .models import DevelopmentNotice
 
 
 OFFICIAL_LIST_URL = "https://www.gimhae.go.kr/03360/00023/00029.web"
-OFFICIAL_URL_MARKER = "not_ancmt_mgt_no="
+EUM_LIST_URL = "https://www.eum.go.kr/web/gs/gv/gvGosiList.jsp"
+EUM_DETAIL_URL = "https://www.eum.go.kr/web/gs/gv/gvGosiDet.jsp"
+OFFICIAL_URL_MARKERS = ("not_ancmt_mgt_no=", "/web/gs/gv/gvGosiDet.jsp?seq=")
+
+
 @dataclass(frozen=True)
 class NoticeSnapshot:
     source_id: str
     notice_number: str
     notice_date: str
     title: str
+    organization_name: str
 
 
 @dataclass(frozen=True)
@@ -31,6 +35,7 @@ class OfficialCandidate:
     notice_number: str
     notice_date: str
     title: str
+    organization_name: str = ""
 
 
 @dataclass(frozen=True)
@@ -144,9 +149,99 @@ def parse_candidates(page_html: str) -> list[OfficialCandidate]:
                     notice_number=notice_number,
                     notice_date=notice_date,
                     title=title,
+                    organization_name="김해시",
                 ),
             )
     return candidates
+
+
+class EumNoticeSearchParser(HTMLParser):
+    """토지이음 고시 목록의 표 행을 읽습니다."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.rows: list[list[dict[str, str]]] = []
+        self.current_row: list[dict[str, str]] | None = None
+        self.current_cell: dict[str, str] | None = None
+
+    def handle_starttag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        attributes = dict(attrs)
+        classes = set((attributes.get("class") or "").split())
+        if tag == "tr" and "center" in classes:
+            self.current_row = []
+            return
+        if self.current_row is None:
+            return
+        if tag == "td":
+            self.current_cell = {
+                "text": "",
+                "title": attributes.get("title") or "",
+                "href": "",
+                "link_title": "",
+            }
+            self.current_row.append(self.current_cell)
+        elif tag == "a" and self.current_cell is not None:
+            self.current_cell["href"] = attributes.get("href") or ""
+            self.current_cell["link_title"] = attributes.get("title") or ""
+
+    def handle_data(self, data: str) -> None:
+        if self.current_cell is not None:
+            self.current_cell["text"] += data
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "td":
+            self.current_cell = None
+        elif tag == "tr" and self.current_row is not None:
+            self.rows.append(self.current_row)
+            self.current_row = None
+            self.current_cell = None
+
+
+def canonical_eum_url(href: str) -> str:
+    parsed = urlparse(urljoin(EUM_LIST_URL, href))
+    sequence = parse_qs(parsed.query).get("seq", [""])[0]
+    if not sequence.isdigit():
+        return ""
+    return f"{EUM_DETAIL_URL}?seq={sequence}"
+
+
+def parse_eum_candidates(page_html: str) -> list[OfficialCandidate]:
+    parser = EumNoticeSearchParser()
+    parser.feed(page_html)
+    candidates: list[OfficialCandidate] = []
+    for cells in parser.rows:
+        if len(cells) < 4:
+            continue
+        href = cells[2]["href"]
+        official_url = canonical_eum_url(href)
+        title = " ".join((cells[2]["link_title"] or cells[2]["text"]).split())
+        notice_number = " ".join((cells[1]["title"] or cells[1]["text"]).split())
+        notice_date = " ".join(cells[0]["text"].split())
+        organization_name = " ".join(
+            (cells[3]["title"] or cells[3]["text"]).split()
+        )
+        if official_url and title and notice_number and notice_date:
+            candidates.append(
+                OfficialCandidate(
+                    url=official_url,
+                    notice_number=notice_number,
+                    notice_date=notice_date,
+                    title=title,
+                    organization_name=organization_name,
+                ),
+            )
+    return candidates
+
+
+def normalize_organization(value: str) -> str:
+    compact = re.sub(r"[^0-9A-Za-z가-힣]", "", value).lower()
+    if compact in {"김해시", "경상남도김해시"}:
+        return "김해시"
+    return compact
 
 
 def choose_exact_candidate(
@@ -155,27 +250,21 @@ def choose_exact_candidate(
 ) -> OfficialCandidate | None:
     expected_number = normalize_notice_number(notice.notice_number)
     expected_title = normalize_title(notice.title)
-    eligible: list[tuple[float, OfficialCandidate]] = []
-
     for candidate in candidates:
         if normalize_notice_number(candidate.notice_number) != expected_number:
             continue
         if candidate.notice_date != notice.notice_date:
             continue
-
-        candidate_title = normalize_title(candidate.title)
-        similarity = SequenceMatcher(None, expected_title, candidate_title).ratio()
+        if normalize_title(candidate.title) != expected_title:
+            continue
         if (
-            similarity >= 0.45
-            or candidate_title in expected_title
-            or expected_title in candidate_title
+            candidate.organization_name
+            and normalize_organization(candidate.organization_name)
+            != normalize_organization(notice.organization_name)
         ):
-            eligible.append((similarity, candidate))
-
-    if not eligible:
-        return None
-    eligible.sort(key=lambda item: item[0], reverse=True)
-    return eligible[0][1]
+            continue
+        return candidate
+    return None
 
 
 async def find_official_link(
@@ -184,25 +273,46 @@ async def find_official_link(
     notice: NoticeSnapshot,
     delay_seconds: float,
 ) -> MatchResult:
+    errors: list[str] = []
+
+    if normalize_organization(notice.organization_name) == "김해시":
+        try:
+            async with semaphore:
+                if delay_seconds:
+                    await asyncio.sleep(delay_seconds)
+                response = await client.get(
+                    OFFICIAL_LIST_URL,
+                    params={"stype": "rno", "sstring": notice.notice_number},
+                )
+                response.raise_for_status()
+            candidate = choose_exact_candidate(notice, parse_candidates(response.text))
+            if candidate:
+                return MatchResult(notice.source_id, candidate.url)
+        except (httpx.HTTPError, ValueError) as error:
+            errors.append(f"김해시청: {error}")
+
     try:
         async with semaphore:
             if delay_seconds:
                 await asyncio.sleep(delay_seconds)
             response = await client.get(
-                OFFICIAL_LIST_URL,
-                params={"stype": "rno", "sstring": notice.notice_number},
+                EUM_LIST_URL,
+                params={"gosino": normalize_notice_number(notice.notice_number)},
             )
             response.raise_for_status()
-        candidate = choose_exact_candidate(notice, parse_candidates(response.text))
+        page_html = response.content.decode("euc-kr", errors="replace")
+        candidate = choose_exact_candidate(notice, parse_eum_candidates(page_html))
         return MatchResult(
             source_id=notice.source_id,
             official_url=candidate.url if candidate else None,
+            error="; ".join(errors) or None,
         )
     except (httpx.HTTPError, ValueError) as error:
+        errors.append(f"토지이음: {error}")
         return MatchResult(
             source_id=notice.source_id,
             official_url=None,
-            error=str(error),
+            error="; ".join(errors),
         )
 
 
@@ -244,6 +354,115 @@ async def collect_matches(
         return results
 
 
+async def fetch_eum_catalog_page(
+    client: httpx.AsyncClient,
+    semaphore: asyncio.Semaphore,
+    *,
+    page: int,
+    from_date: str,
+    to_date: str,
+    delay_seconds: float,
+) -> tuple[str, list[OfficialCandidate]]:
+    async with semaphore:
+        if delay_seconds:
+            await asyncio.sleep(delay_seconds)
+        response = await client.get(
+            EUM_LIST_URL,
+            params={
+                "selSggCd": "4825000000",
+                "listSize": 100,
+                "pageNo": page,
+                "startdt": from_date,
+                "enddt": to_date,
+            },
+        )
+        response.raise_for_status()
+    page_html = response.content.decode("euc-kr", errors="replace")
+    return page_html, parse_eum_candidates(page_html)
+
+
+async def collect_eum_catalog_matches(
+    notices: list[NoticeSnapshot],
+    *,
+    concurrency: int,
+    delay_seconds: float,
+) -> list[MatchResult]:
+    """김해시 고시 목록을 페이지별로 받은 뒤 로컬에서 정확 대조합니다."""
+    if not notices:
+        return []
+
+    from_date = min(notice.notice_date for notice in notices)
+    to_date = max(notice.notice_date for notice in notices)
+    semaphore = asyncio.Semaphore(concurrency)
+    headers = {
+        "Accept": "text/html,application/xhtml+xml",
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 Chrome/140 Safari/537.36"
+        ),
+    }
+    async with httpx.AsyncClient(
+        headers=headers,
+        follow_redirects=True,
+        timeout=60,
+    ) as client:
+        first_html, first_candidates = await fetch_eum_catalog_page(
+            client,
+            semaphore,
+            page=1,
+            from_date=from_date,
+            to_date=to_date,
+            delay_seconds=delay_seconds,
+        )
+        page_numbers = [
+            int(value)
+            for value in re.findall(
+                r'pageNo=(\d+)[^\"]*\" title=\"마지막 페이지로 이동',
+                first_html,
+            )
+        ]
+        total_pages = max(page_numbers, default=1)
+        print(
+            f"토지이음 김해시 고시 목록: {from_date}~{to_date}, "
+            f"{total_pages}페이지"
+        )
+
+        candidates = list(first_candidates)
+        tasks = [
+            asyncio.create_task(
+                fetch_eum_catalog_page(
+                    client,
+                    semaphore,
+                    page=page,
+                    from_date=from_date,
+                    to_date=to_date,
+                    delay_seconds=delay_seconds,
+                ),
+            )
+            for page in range(2, total_pages + 1)
+        ]
+        try:
+            for completed, task in enumerate(asyncio.as_completed(tasks), start=2):
+                _, page_candidates = await task
+                candidates.extend(page_candidates)
+                if completed % 5 == 0 or completed == total_pages:
+                    print(f"토지이음 목록 수집: {completed}/{total_pages}페이지")
+        except Exception:
+            for task in tasks:
+                task.cancel()
+            raise
+
+    print(f"토지이음 공식 고시 후보: {len(candidates)}건")
+    return [
+        MatchResult(
+            source_id=notice.source_id,
+            official_url=(candidate.url if candidate else None),
+        )
+        for notice in notices
+        for candidate in [choose_exact_candidate(notice, candidates)]
+    ]
+
+
 def load_notices(
     *,
     limit: int | None,
@@ -260,7 +479,12 @@ def load_notices(
             )
         if not refresh:
             statement = statement.where(
-                ~DevelopmentNotice.source_url.contains(OFFICIAL_URL_MARKER),
+                ~or_(
+                    *(
+                        DevelopmentNotice.source_url.contains(marker)
+                        for marker in OFFICIAL_URL_MARKERS
+                    ),
+                ),
             )
         statement = statement.order_by(
             DevelopmentNotice.notice_date.desc(),
@@ -275,6 +499,7 @@ def load_notices(
                 notice_number=row.notice_number,
                 notice_date=row.notice_date,
                 title=row.title,
+                organization_name=row.organization_name or "김해시",
             )
             for row in rows
         ]
@@ -303,7 +528,7 @@ def save_matches(results: list[MatchResult]) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="UPIS 고시를 김해시청 공식 고시공고 고유 URL과 연결합니다.",
+        description="UPIS 고시를 발행기관의 공식 고시 원문과 연결합니다.",
     )
     parser.add_argument("--limit", type=int)
     parser.add_argument("--notice-number")
@@ -321,8 +546,9 @@ def main() -> None:
         print("확인할 고시가 없습니다.")
         return
 
+    collector = collect_matches if args.notice_number else collect_eum_catalog_matches
     results = asyncio.run(
-        collect_matches(
+        collector(
             notices,
             concurrency=max(1, args.concurrency),
             delay_seconds=max(0, args.delay_seconds),
@@ -330,7 +556,7 @@ def main() -> None:
     )
     saved_count = save_matches(results)
     error_count = sum(result.error is not None for result in results)
-    print(f"김해시청 공식 고시공고 링크 저장 완료: {saved_count}개")
+    print(f"공식 고시 원문 링크 저장 완료: {saved_count}개")
     print(f"공식 링크 미확인: {len(results) - saved_count - error_count}개")
     print(f"조회 오류: {error_count}개")
     for result in results:
