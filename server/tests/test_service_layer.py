@@ -141,6 +141,24 @@ class ServiceLayerApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["items"][0]["sourceUrl"], "")
 
+    def test_development_notice_exposes_verified_eum_url(self):
+        official_url = (
+            "https://www.eum.go.kr/web/gs/gv/gvGosiDet.jsp?seq=638912"
+        )
+        with self.sessions() as db:
+            db.add(DevelopmentNotice(
+                source="GIMHAE_UPIS", source_id="notice-eum", notice_number="2026-369",
+                title="개발계획", notice_type_code="A", notice_type="고시",
+                notice_date="2026-07-30", organization_name="경상남도",
+                stage="ACTIVE", stage_label="진행", source_url=official_url,
+                fetched_at=datetime.now(timezone.utc),
+            ))
+            db.commit()
+
+        response = self.client.get("/api/development/notices")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["items"][0]["sourceUrl"], official_url)
+
     def test_population_validation_and_missing_month_contract(self):
         response = self.client.get(
             "/api/population/regions", params={"level": "admin", "year": 2025, "month": 12}

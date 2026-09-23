@@ -9,18 +9,29 @@ interface OfficialNoticeWindowProps {
   onClose: () => void
 }
 
-function hasVerifiedOfficialUrl(notice: DevelopmentNotice) {
+function getOfficialSourceLabel(notice: DevelopmentNotice) {
   try {
     const url = new URL(notice.sourceUrl)
-    return (
+    if (
       url.protocol === 'https:' &&
       url.hostname === 'www.gimhae.go.kr' &&
       url.pathname === '/03360/00023/00029.web' &&
       url.searchParams.has('not_ancmt_mgt_no')
-    )
+    ) return '김해시청 원문'
+    if (
+      url.protocol === 'https:' &&
+      ['eum.go.kr', 'www.eum.go.kr'].includes(url.hostname) &&
+      url.pathname === '/web/gs/gv/gvGosiDet.jsp' &&
+      /^\d+$/.test(url.searchParams.get('seq') ?? '')
+    ) return '토지이음 원문'
+    return ''
   } catch {
-    return false
+    return ''
   }
+}
+
+function hasVerifiedOfficialUrl(notice: DevelopmentNotice) {
+  return Boolean(getOfficialSourceLabel(notice))
 }
 
 function openOfficialNotice(url: string) {
@@ -104,9 +115,9 @@ export default function OfficialNoticeWindow({
       >
         <header className="official-notice-header">
           <div>
-            <span className="official-notice-eyebrow">김해시청 공식 게시판</span>
+            <span className="official-notice-eyebrow">발행기관 공식 고시</span>
             <h2 id="official-notice-window-title">고시공고 원문</h2>
-            <p>개발구역과 연결된 김해시 공식 고시공고를 확인할 수 있습니다.</p>
+            <p>번호·날짜·제목·발행기관을 대조한 공식 원문만 연결합니다.</p>
           </div>
           <button
             type="button"
@@ -170,6 +181,7 @@ export default function OfficialNoticeWindow({
           ) : filteredNotices.length ? (
             filteredNotices.map((notice) => {
               const verified = hasVerifiedOfficialUrl(notice)
+              const officialSourceLabel = getOfficialSourceLabel(notice)
 
               return (
                 <article className="official-notice-item" key={notice.id}>
@@ -200,7 +212,7 @@ export default function OfficialNoticeWindow({
                     <span>{notice.noticeNumber || '고시번호 미상'}</span>
                     <span>{notice.organizationName || '김해시 관련 부서'}</span>
                     <span className={verified ? 'link-verified' : 'link-unverified'}>
-                      {verified ? '김해시청 원문 열기 ↗' : '공식 원문 링크 미확인'}
+                      {verified ? `${officialSourceLabel} 열기 ↗` : '공식 원문 링크 미확인'}
                     </span>
                   </div>
                 </article>

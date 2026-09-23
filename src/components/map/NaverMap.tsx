@@ -126,9 +126,17 @@ function renderDevelopmentNotices(notices: DevelopmentNotice[]): string {
               'onclick="window.open(this.href,\'OfficialNotice\',\'width=1200,height=850,scrollbars=yes,resizable=yes\'); return false;">' +
               `${escapeHtml(notice.title)}</a>`
             : `<strong class="development-notice-title is-unlinked">${escapeHtml(notice.title)}</strong>`
-          const linkStatus = notice.sourceUrl
-            ? '김해시청 공식 고시공고'
-            : '공식 원문 링크 미확인'
+          let linkStatus = '공식 원문 링크 미확인'
+          if (notice.sourceUrl) {
+            try {
+              const hostname = new URL(notice.sourceUrl).hostname
+              linkStatus = hostname.endsWith('eum.go.kr')
+                ? '토지이음 공식 고시 원문'
+                : '김해시청 공식 고시공고'
+            } catch {
+              linkStatus = '공식 원문 링크 미확인'
+            }
+          }
           return (
             '<article class="development-notice-preview">' +
               title +
