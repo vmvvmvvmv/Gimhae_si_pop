@@ -126,7 +126,7 @@ function renderDevelopmentNotices(notices: DevelopmentNotice[]): string {
               'onclick="window.open(this.href,\'OfficialNotice\',\'width=1200,height=850,scrollbars=yes,resizable=yes\'); return false;">' +
               `${escapeHtml(notice.title)}</a>`
             : `<strong class="development-notice-title is-unlinked">${escapeHtml(notice.title)}</strong>`
-          let linkStatus = '공식 원문 링크 미확인'
+          let linkStatus = notice.officialLinkStatusLabel
           if (notice.sourceUrl) {
             try {
               const hostname = new URL(notice.sourceUrl).hostname
@@ -136,7 +136,7 @@ function renderDevelopmentNotices(notices: DevelopmentNotice[]): string {
                   ? '토지이음 공식 고시 원문'
                   : '김해시청 공식 고시공고'
             } catch {
-              linkStatus = '공식 원문 링크 미확인'
+              linkStatus = notice.officialLinkStatusLabel
             }
           }
           return (

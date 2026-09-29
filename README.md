@@ -135,6 +135,15 @@ cd /d C:\Users\User\Documents\ChatGPT\Gimhae_si_Map\server
 .venv\Scripts\python.exe -m app.audit_official_notice_mismatches --concurrency 3 --delay-seconds 0.2
 ```
 
+기존 DB에 상태 열을 처음 추가할 때는 마이그레이션을 한 번 실행합니다. 화면에
+미확인 이유도 표시하려면 공식 사이트를 다시 대조해 상태만 저장합니다. 후보
+링크나 공문 사본은 저장하지 않습니다.
+
+```text
+.venv\Scripts\python.exe -m app.migrate_development_notice_status
+.venv\Scripts\python.exe -m app.audit_official_notice_mismatches --concurrency 3 --delay-seconds 0.2 --save-status
+```
+
 유동·주거인구 CSV는 먼저 미리보기로 열 구조와 지역 코드 일치 여부를 확인한
 후 SQLite에 저장합니다. 아래 명령의 CSV 경로는 실제 다운로드 파일 경로로
 바꿉니다.

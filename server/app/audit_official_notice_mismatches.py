@@ -1,8 +1,9 @@
 """공식 원문과 연결되지 않은 개발 고시의 불일치 원인을 점검합니다.
 
-이 명령은 데이터베이스를 수정하지 않습니다. 토지이음과 경상남도 공식
+기본 실행은 데이터베이스를 수정하지 않습니다. 토지이음과 경상남도 공식
 목록을 수집한 뒤 고시번호가 같은 후보를 비교해 검토용 CSV와 Markdown
-요약을 만듭니다.
+요약을 만듭니다. ``--save-status``를 지정하면 후보 URL을 저장하지 않고
+확인 결과 상태만 저장합니다.
 """
 
 import argparse
@@ -23,6 +24,9 @@ from .sync_official_notice_links import (
     normalize_organization,
     normalize_title,
 )
+from .db import SessionLocal
+from .official_notice_status import AUDIT_REASON_TO_STATUS
+from .services.development_sync_service import save_official_notice_statuses
 
 
 REASON_LABELS = {
@@ -264,6 +268,11 @@ def main() -> None:
     parser.add_argument("--concurrency", type=int, default=3)
     parser.add_argument("--delay-seconds", type=float, default=0.2)
     parser.add_argument(
+        "--save-status",
+        action="store_true",
+        help="공식 원문 후보 URL 없이 미확인 사유 상태만 DB에 저장합니다.",
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         default=Path("data/reports"),
@@ -293,6 +302,15 @@ def main() -> None:
     markdown_path = args.output_dir / f"official_notice_mismatch_audit_{suffix}.md"
     write_csv(rows, csv_path)
     write_markdown(rows, markdown_path, candidate_count)
+
+    if args.save_status:
+        statuses = {
+            row.notice.source_id: AUDIT_REASON_TO_STATUS[row.reason]
+            for row in rows
+        }
+        with SessionLocal.begin() as db:
+            saved_status_count = save_official_notice_statuses(db, statuses)
+        print(f"공식 원문 확인 상태 저장 완료: {saved_status_count}건")
 
     counts = Counter(row.reason for row in rows)
     print(f"미연결 고시 점검 완료: {len(rows)}건")

@@ -1,7 +1,9 @@
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from ..core.time import utc_now
 from ..models import DevelopmentNotice
+from ..official_notice_status import VERIFIED
 
 
 def deactivate_development_notices_in_range(
@@ -152,5 +154,26 @@ def update_development_notice_urls(
     ).all()
     for row in rows:
         row.source_url = urls_by_source_id[row.source_id]
+        row.official_link_status = VERIFIED
+        row.official_link_checked_at = utc_now()
+    db.flush()
+    return len(rows)
+
+
+def update_development_notice_statuses(
+    db: Session,
+    statuses_by_source_id: dict[str, str],
+) -> int:
+    if not statuses_by_source_id:
+        return 0
+    rows = db.scalars(
+        select(DevelopmentNotice).where(
+            DevelopmentNotice.source_id.in_(statuses_by_source_id),
+        ),
+    ).all()
+    checked_at = utc_now()
+    for row in rows:
+        row.official_link_status = statuses_by_source_id[row.source_id]
+        row.official_link_checked_at = checked_at
     db.flush()
     return len(rows)

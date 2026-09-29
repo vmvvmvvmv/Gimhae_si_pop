@@ -11,7 +11,10 @@ from sqlalchemy.pool import StaticPool
 from app.db import Base, get_db
 from app.main import app
 from app.models import DevelopmentNotice, Facility
-from app.services.development_sync_service import replace_development_notices
+from app.services.development_sync_service import (
+    replace_development_notices,
+    save_official_notice_statuses,
+)
 from app.sync_vworld_facilities import REQUIRED_TRANSIT_STATIONS, validate_transit_coverage
 
 
@@ -136,12 +139,18 @@ class ServiceLayerApiTests(unittest.TestCase):
                 title="개발계획", notice_type_code="A", notice_type="고시",
                 notice_date="2025-01-01", stage="ACTIVE", stage_label="진행",
                 source_url="https://example.com/notice", fetched_at=datetime.now(timezone.utc),
+                official_link_status="DATE_MISMATCH",
             ))
             db.commit()
 
         response = self.client.get("/api/development/notices")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["items"][0]["sourceUrl"], "")
+        self.assertEqual(
+            response.json()["items"][0]["officialLinkStatus"],
+            "DATE_MISMATCH",
+        )
+        self.assertIn("고시일이 다릅니다", response.json()["items"][0]["officialLinkMessage"])
 
     def test_development_notice_exposes_verified_eum_url(self):
         official_url = (
@@ -160,6 +169,7 @@ class ServiceLayerApiTests(unittest.TestCase):
         response = self.client.get("/api/development/notices")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["items"][0]["sourceUrl"], official_url)
+        self.assertEqual(response.json()["items"][0]["officialLinkStatus"], "VERIFIED")
 
     def test_development_notice_exposes_verified_gyeongnam_url(self):
         official_url = (
@@ -260,6 +270,39 @@ class ServiceLayerApiTests(unittest.TestCase):
             self.assertIsNotNone(existing)
             self.assertTrue(existing.is_active)
             self.assertIsNone(new_row)
+
+    def test_official_notice_status_update_does_not_store_candidate_url(self):
+        fetched_at = datetime.now(timezone.utc)
+        with self.sessions.begin() as db:
+            db.add(DevelopmentNotice(
+                source="GIMHAE_UPIS", source_id="unverified", notice_number="2025-9",
+                title="확인 중인 고시", notice_type_code="A", notice_type="고시",
+                notice_date="2025-09-01", stage="ACTIVE", stage_label="진행",
+                source_url="https://gimhae.go.kr/upis/notification.do",
+                fetched_at=fetched_at,
+            ))
+
+        with self.sessions.begin() as db:
+            saved = save_official_notice_statuses(
+                db,
+                {"unverified": "TITLE_MISMATCH"},
+            )
+            self.assertEqual(saved, 1)
+
+        with self.sessions() as db:
+            row = db.scalar(select(DevelopmentNotice).where(
+                DevelopmentNotice.source_id == "unverified",
+            ))
+            self.assertEqual(row.official_link_status, "TITLE_MISMATCH")
+            self.assertEqual(
+                row.source_url,
+                "https://gimhae.go.kr/upis/notification.do",
+            )
+            self.assertIsNotNone(row.official_link_checked_at)
+
+        with self.sessions.begin() as db:
+            with self.assertRaisesRegex(ValueError, "지원하지 않는 공식 원문 상태"):
+                save_official_notice_statuses(db, {"unverified": "CUSTOM_EXCEPTION"})
 
     def test_database_error_response_hides_internal_details(self):
         with patch(

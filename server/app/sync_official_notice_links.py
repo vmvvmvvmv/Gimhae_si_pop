@@ -65,7 +65,7 @@ class MatchResult:
 
 # 오래된 고시는 토지이음 상세 원문이 남아 있어도 검색 목록에서 누락되는 경우가
 # 있습니다. 상세 화면의 고시번호·날짜·제목·기관을 직접 대조한 건만 보관합니다.
-REVIEWED_EUM_CANDIDATES = (
+VERIFIED_OFFICIAL_DETAIL_CANDIDATES = (
     OfficialCandidate(
         url="https://www.eum.go.kr/web/gs/gv/gvGosiDet.jsp?seq=276640",
         notice_number="2009-257",
@@ -423,7 +423,7 @@ async def find_official_link(
 
     reviewed_candidate = choose_exact_candidate(
         notice,
-        list(REVIEWED_EUM_CANDIDATES),
+        list(VERIFIED_OFFICIAL_DETAIL_CANDIDATES),
     )
     if reviewed_candidate:
         return MatchResult(notice.source_id, reviewed_candidate.url)
