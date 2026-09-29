@@ -226,6 +226,24 @@
   line-height: 1.55;
 }
 
+.official-notice-item .official-notice-status-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 9px;
+  border-left: 3px solid #d39a48;
+  padding: 7px 10px;
+  color: #6d5432;
+  background: #fff8ea;
+  font-size: 12px;
+}
+
+.official-notice-status-note strong { color: #8c5c18; }
+.official-notice-status-note small {
+  flex-basis: 100%;
+  color: #7d756b;
+  font-size: 11px;
+}
+
 .official-notice-item-meta {
   color: #77736d;
   font-size: 12px;
