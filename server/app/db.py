@@ -31,5 +31,10 @@ def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        # 조회 API도 SQLAlchemy의 암시적 트랜잭션을 사용합니다. 향후 쓰기
+        # API가 추가되더라도 실패한 요청의 변경이 남지 않도록 명시합니다.
+        db.rollback()
+        raise
     finally:
         db.close()

@@ -178,12 +178,84 @@ sequenceDiagram
 
 화면 조회 경로는 `server/app/api/` → `server/app/services/` →
 `server/app/repositories/` → SQLite 순서다. API는 `get_db` 의존성으로
-요청별 세션을 주입하고, 서비스에는 그 세션을 인자로 전달한다. 데이터 수집
-명령(`sync_*`, `import_*`)은 별도의 배치 진입점이며 기존 저장소 함수를 사용한다.
-인구 저장소의 복잡한 집계 SQL과 결과 조립은 현재 함께 남아 있어, 저장소를
-순수 CRUD 계층으로 만드는 추가 분리는 별도 작업이다.
+요청별 세션을 주입하고, 서비스에는 그 세션을 인자로 전달한다. 반복 실행하는
+핵심 동기화 명령은 별도의 배치 진입점에서 동기화 서비스를 거쳐 저장소를
+호출한다. 저장소는 SQL 실행과 `flush`까지만 담당하고 `commit`은 하지 않는다.
+초기 DB 생성과 일부 일회성 GeoJSON·CSV 가져오기 도구는 모델을 직접 다루되
+`SessionLocal.begin()`으로 실패 시 전체 롤백한다. 인구 저장소의 복잡한 집계
+SQL과 결과 조립은 현재 함께 남아 있어 추가 분리는 별도 작업이다.
 
-## 6. 조회 가능 기간 확인
+## 6. 의존성·트랜잭션·예외 처리
+
+### 코드가 호출되는 방향
+
+```mermaid
+flowchart LR
+    ENTRY[API 컨트롤러 또는 배치 명령] --> SERVICE[서비스\n업무 규칙·응답 조립]
+    SERVICE --> REPO[리포지토리\nSQL 조회·저장·flush]
+    SERVICE --> CLIENT[외부 API 클라이언트]
+    REPO --> DB[(SQLite)]
+    CLIENT --> PUBLIC[공공 API]
+```
+
+`api/`와 배치 명령은 서비스를 호출하고, 서비스는 리포지토리 또는 외부 API
+클라이언트를 호출한다. 리포지토리가 서비스나 API를 역으로 참조하지 않는다.
+
+### 저장 작업의 트랜잭션 범위
+
+```mermaid
+sequenceDiagram
+    participant B as 배치 명령
+    participant S as 동기화 서비스
+    participant R as 리포지토리
+    participant D as SQLite
+
+    B->>B: 외부 API 수집 완료
+    B->>D: SessionLocal.begin()
+    B->>S: 한 업무 단위 저장 요청
+    S->>R: 비활성화·upsert
+    R->>D: SQL 실행·flush
+    alt 모두 성공
+        B->>D: 자동 commit
+    else 하나라도 실패
+        B->>D: 자동 rollback
+    end
+```
+
+외부 API 호출이 끝난 뒤에만 짧게 DB 트랜잭션을 연다. 예를 들어 개발 고시는
+기존 범위 비활성화와 신규 고시 저장을 한 트랜잭션으로 묶으므로, 신규 저장이
+실패하면 앞선 비활성화도 함께 취소된다. `SessionLocal.begin()`이 정상 종료 시
+커밋하고 예외 발생 시 롤백한다.
+
+### 예외가 사용자 응답으로 바뀌는 과정
+
+```mermaid
+flowchart LR
+    ERROR[오류 발생] --> DOMAIN{예상 가능한 오류?}
+    DOMAIN -->|지역·자료 없음| API[API에서 400·404 변환]
+    DOMAIN -->|외부 API 실패| UPSTREAM[502 또는 실패 지역 기록]
+    DOMAIN -->|DB 오류| DBHANDLER[공통 DB 예외 처리기]
+    DBHANDLER --> LOG[서버 로그에 상세 원인]
+    DBHANDLER --> SAFE[사용자에게 안전한 500 메시지]
+```
+
+요청별 DB 세션은 오류 발생 시 명시적으로 롤백한다. SQLAlchemy 내부 오류는
+공통 처리기가 서버 로그에 기록하고, 테이블명·SQL·로컬 경로 같은 내부 정보는
+API 응답에 노출하지 않는다.
+
+### 관련 코드
+
+| 역할 | 파일 |
+| --- | --- |
+| 요청별 세션과 롤백 | `server/app/db.py` |
+| DB 공통 오류 응답 | `server/app/main.py` |
+| 개발 고시 원자적 저장 | `server/app/services/development_sync_service.py` |
+| 시설 저장 서비스 | `server/app/services/facility_sync_service.py` |
+| 인구 저장 서비스 | `server/app/services/population_sync_service.py` |
+| SQL 저장·조회 | `server/app/repositories/` |
+| 롤백·오류 노출 방지 테스트 | `server/tests/test_service_layer.py` |
+
+## 7. 조회 가능 기간 확인
 
 화면은 시작할 때 `GET /api/population/availability`를 호출합니다.
 이 API는 행정동·법정동별로 다음 정보를 계산합니다.
@@ -196,7 +268,7 @@ sequenceDiagram
 따라서 아직 수집되지 않은 월은 화면의 선택 목록에 노출되지 않으며,
 41개 법정동 중 일부만 저장된 월은 `complete: false`로 확인할 수 있습니다.
 
-## 7. 기준월 비교 API
+## 8. 기준월 비교 API
 
 선택 지역의 임의의 두 기준년월을 비교할 때 다음 API를 사용합니다.
 
@@ -212,7 +284,7 @@ GET /api/population/comparison
 화면에서는 현재 조회월과 전월·전년 동월 비교를 유지하면서,
 별도의 비교 기준월을 선택해 장기 변화도 확인할 수 있습니다.
 
-## 8. 전국 인구 기준값 API
+## 9. 전국 인구 기준값 API
 
 전국 인구밀도 비교를 위해 행정안전부 전국 주민등록 인구 합계를 별도로 저장합니다.
 수집 스크립트가 원천 API의 전국 코드(`0`)를 조회하고, `lv=1` 시도 단위 응답이 오면 중복을 제거해 합산합니다.
@@ -234,14 +306,14 @@ GET /api/national-density?year=2025&month=12
 화면에서는 지역 인구밀도를 전국 평균으로 나누어
 전국 평균 대비 배수와 차이를 표시합니다.
 
-## 9. 보안·운영 정책
+## 10. 보안·운영 정책
 
 - 브라우저에는 네이버 지도용 Client ID만 노출하고, 행정안전부 서비스 키는 백엔드 환경 변수로만 관리합니다.
 - 저장 데이터 조회 API와 원천 API 프록시를 분리합니다. 원천 API 프록시는 기본 비활성화하며, 운영에서 활성화할 경우 인증과 요청 제한을 함께 적용해야 합니다.
 - CORS 허용 Origin은 `CORS_ORIGINS`로 명시하고, 임의 Origin·자격 증명 공유·전체 헤더 허용을 사용하지 않습니다.
 - `/login`과 `/admin`은 현재 화면 자리만 있는 상태이므로 실제 관리자 기능을 연결하기 전 서버 측 인증·권한 검사를 추가해야 합니다.
 
-## 10. 주요 시설 데이터 품질 경로
+## 11. 주요 시설 데이터 품질 경로
 
 시설은 `sync_vworld_facilities.py`가 VWorld 장소 검색 결과를 수집하고,
 `facility_quality.py`의 규칙을 거쳐 `facilities` 테이블에 저장합니다.
@@ -277,7 +349,7 @@ VWorld에 위치가 등록된 사실만 확인했으며, 현재 여객 취급·�
 공식 운행 자료로 검증하지 못했습니다. 따라서 이 다섯 곳의 지도 표시는
 운영 보증이 아닙니다. 공원별 운영 상태도 공식 원장과 계속 대조해야 합니다.
 
-## 11. 개발 고시 공식 원문 검증
+## 12. 개발 고시 공식 원문 검증
 
 `sync_official_notice_links.py`는 UPIS 개발 고시를 김해시 공식 고시공고,
 국토교통부 토지이음, 경상남도 공식 고시공고 원장에 대조합니다. 전체 동기화에서는 토지이음의

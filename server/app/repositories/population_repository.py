@@ -35,7 +35,7 @@ def save_national_population(
     row.population = population
     row.source = source
     row.fetched_at = utc_now()
-    db.commit()
+    db.flush()
     db.refresh(row)
     return row
 
@@ -70,7 +70,7 @@ def save_national_area(
     row.source = source
     row.fetched_at = utc_now()
 
-    db.commit()
+    db.flush()
     db.refresh(row)
     return row
 
@@ -116,7 +116,7 @@ def save_national_admin_population(
         row.fetched_at = utc_now()
         saved_count += 1
 
-    db.commit()
+    db.flush()
     return saved_count
 
 
@@ -645,7 +645,8 @@ def save_population(
 
         saved_count += 1
 
-    db.commit()
+    # 월별 인구와 연령 분포는 반드시 함께 성공하거나 함께 취소되어야 합니다.
+    db.flush()
     return saved_count
 
 

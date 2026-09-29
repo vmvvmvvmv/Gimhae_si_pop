@@ -1,7 +1,10 @@
+import logging
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 
 from .api.population import router as population_router
 from .api.national_population import router as national_population_router
@@ -16,6 +19,25 @@ app = FastAPI(
     title="지역 인구 지도 API",
     version="0.1.0",
 )
+logger = logging.getLogger(__name__)
+
+
+@app.exception_handler(SQLAlchemyError)
+async def sqlalchemy_exception_handler(
+    request: Request,
+    error: SQLAlchemyError,
+) -> JSONResponse:
+    """DB 내부 정보는 숨기고 서버 로그에만 원인을 남깁니다."""
+    logger.exception(
+        "Database operation failed: %s %s",
+        request.method,
+        request.url.path,
+        exc_info=error,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "데이터를 처리하는 중 오류가 발생했습니다."},
+    )
 
 app.add_middleware(
     CORSMiddleware,
