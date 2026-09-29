@@ -215,11 +215,18 @@ export default function OfficialNoticeWindow({
                     </strong>
                   )}
                   <p>{notice.summary || '상세 요약은 공식 원문에서 확인해 주세요.'}</p>
+                  {!verified && (
+                    <p className="official-notice-status-note">
+                      <strong>{notice.officialLinkStatusLabel}</strong>
+                      <span>{notice.officialLinkMessage}</span>
+                      <small>구역 경계는 VWorld, 고시 정보는 김해 UPIS 자료입니다.</small>
+                    </p>
+                  )}
                   <div className="official-notice-item-meta">
                     <span>{notice.noticeNumber || '고시번호 미상'}</span>
                     <span>{notice.organizationName || '김해시 관련 부서'}</span>
                     <span className={verified ? 'link-verified' : 'link-unverified'}>
-                      {verified ? `${officialSourceLabel} 열기 ↗` : '공식 원문 링크 미확인'}
+                      {verified ? `${officialSourceLabel} 열기 ↗` : notice.officialLinkStatusLabel}
                     </span>
                   </div>
                 </article>

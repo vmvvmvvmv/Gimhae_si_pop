@@ -3,6 +3,13 @@ from urllib.parse import parse_qs, urlparse
 from sqlalchemy.orm import Session
 
 from ..models import DevelopmentNotice
+from ..official_notice_status import (
+    PENDING,
+    STATUS_LABELS,
+    STATUS_MESSAGES,
+    VALID_STATUSES,
+    VERIFIED,
+)
 from ..repositories.development_repository import get_development_notices
 
 
@@ -42,6 +49,17 @@ def verified_official_url(value: str) -> str:
 
 
 def serialize_notice(row: DevelopmentNotice) -> dict[str, object]:
+    official_url = verified_official_url(row.source_url)
+    stored_status = (
+        row.official_link_status
+        if row.official_link_status in VALID_STATUSES
+        else PENDING
+    )
+    status = (
+        VERIFIED
+        if official_url
+        else PENDING if stored_status == VERIFIED else stored_status
+    )
     return {
         "id": row.id,
         "sourceId": row.source_id,
@@ -55,7 +73,10 @@ def serialize_notice(row: DevelopmentNotice) -> dict[str, object]:
         "stageLabel": row.stage_label,
         "source": row.source,
         # 번호·날짜·제목·발행기관을 대조한 공식 고유 URL만 제공합니다.
-        "sourceUrl": verified_official_url(row.source_url),
+        "sourceUrl": official_url,
+        "officialLinkStatus": status,
+        "officialLinkStatusLabel": STATUS_LABELS.get(status, STATUS_LABELS[PENDING]),
+        "officialLinkMessage": STATUS_MESSAGES.get(status, STATUS_MESSAGES[PENDING]),
     }
 
 
