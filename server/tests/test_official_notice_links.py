@@ -1,8 +1,11 @@
+import asyncio
 import unittest
+from unittest.mock import AsyncMock, patch
 
 from app.sync_official_notice_links import (
     OfficialCandidate,
     NoticeSnapshot,
+    find_official_link,
     choose_exact_candidate,
     parse_eum_candidates,
     parse_gyeongnam_candidates,
@@ -75,6 +78,34 @@ class OfficialNoticeLinkTests(unittest.TestCase):
             "gosiGbn=N&sno=55047&svp=Y",
         )
         self.assertEqual(choose_exact_candidate(self.notice, candidates), candidates[0])
+
+    def test_reviewed_eum_candidate_still_requires_an_exact_match(self):
+        notice = NoticeSnapshot(
+            source_id="48250NTC200905211648",
+            notice_number="2009-257",
+            notice_date="2009-05-21",
+            title="김해 삼어지구 도시개발사업 개발계획 변경 및 실시계획인가 고시",
+            organization_name="경상남도",
+        )
+        client = AsyncMock()
+        semaphore = asyncio.Semaphore(1)
+
+        result = asyncio.run(
+            find_official_link(client, semaphore, notice, 0),
+        )
+
+        self.assertEqual(
+            result.official_url,
+            "https://www.eum.go.kr/web/gs/gv/gvGosiDet.jsp?seq=276640",
+        )
+        client.get.assert_not_called()
+
+        changed = NoticeSnapshot(**{**notice.__dict__, "notice_date": "2009-05-18"})
+        with patch.object(client, "get", side_effect=RuntimeError("network called")):
+            with self.assertRaises(RuntimeError):
+                asyncio.run(
+                    find_official_link(client, semaphore, changed, 0),
+                )
 
     def test_audit_classifies_each_mismatch_without_relaxing_match(self):
         exact = parse_eum_candidates(EUM_LIST_SAMPLE)[0]
