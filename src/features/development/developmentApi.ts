@@ -1,5 +1,15 @@
 import { API_BASE_URL } from '../../lib/apiConfig'
 
+export type OfficialLinkStatus =
+  | 'VERIFIED'
+  | 'PENDING'
+  | 'NOT_FOUND'
+  | 'DATE_MISMATCH'
+  | 'TITLE_MISMATCH'
+  | 'DATE_TITLE_MISMATCH'
+  | 'ORG_MISMATCH'
+  | 'SOURCE_ERROR'
+
 export interface DevelopmentNotice {
   id: number
   sourceId: string
@@ -13,6 +23,9 @@ export interface DevelopmentNotice {
   stageLabel: string
   source: string
   sourceUrl: string
+  officialLinkStatus: OfficialLinkStatus
+  officialLinkStatusLabel: string
+  officialLinkMessage: string
 }
 
 export interface DevelopmentNoticeResponse {

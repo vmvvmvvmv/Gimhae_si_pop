@@ -202,6 +202,13 @@ class DevelopmentNotice(Base):
     stage: Mapped[str] = mapped_column(String(50), index=True)
     stage_label: Mapped[str] = mapped_column(String(100))
     source_url: Mapped[str] = mapped_column(String(500))
+    official_link_status: Mapped[str] = mapped_column(
+        String(30),
+        default="PENDING",
+        server_default="PENDING",
+        index=True,
+    )
+    official_link_checked_at: Mapped[datetime | None] = mapped_column(nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True, index=True)
     fetched_at: Mapped[datetime] = mapped_column(default=utc_now)
 
