@@ -12,10 +12,7 @@ import httpx
 
 from .core.time import utc_now
 from .db import Base, SessionLocal, engine
-from .repositories.development_repository import (
-    deactivate_development_notices_in_range,
-    upsert_development_notices,
-)
+from .services.development_sync_service import replace_development_notices
 
 
 UPIS_BASE_URL = "https://gimhae.go.kr/upis"
@@ -233,15 +230,15 @@ def main() -> None:
         )
     )
     Base.metadata.create_all(bind=engine)
-    with SessionLocal() as db:
+    with SessionLocal.begin() as db:
         # 같은 기간을 다시 동기화할 때 필터에서 제외된 기존 행은 삭제하지
         # 않고 비활성화합니다. 원본 이력은 남기면서 화면에는 노출하지 않습니다.
-        deactivate_development_notices_in_range(
+        saved_count = replace_development_notices(
             db,
-            args.from_date,
-            args.to_date,
+            from_date=args.from_date,
+            to_date=args.to_date,
+            notices=notices,
         )
-        saved_count = upsert_development_notices(db, notices)
 
     print(f"김해시 UPIS 개발 관련 고시 동기화 완료: {saved_count}건")
 

@@ -10,10 +10,12 @@ from html.parser import HTMLParser
 from urllib.parse import parse_qs, urlencode, urljoin, urlparse
 
 import httpx
-from sqlalchemy import or_, select
 
 from .db import SessionLocal
-from .models import DevelopmentNotice
+from .services.development_sync_service import (
+    load_official_link_targets,
+    save_official_notice_urls,
+)
 
 
 OFFICIAL_LIST_URL = "https://www.gimhae.go.kr/03360/00023/00029.web"
@@ -704,33 +706,14 @@ def load_notices(
     refresh: bool,
 ) -> list[NoticeSnapshot]:
     with SessionLocal() as db:
-        statement = select(DevelopmentNotice).where(
-            DevelopmentNotice.is_active.is_(True),
+        rows = load_official_link_targets(
+            db,
+            official_url_markers=OFFICIAL_URL_MARKERS,
+            limit=limit,
+            notice_number=notice_number,
+            organization_name=organization_name,
+            refresh=refresh,
         )
-        if notice_number:
-            statement = statement.where(
-                DevelopmentNotice.notice_number == notice_number,
-            )
-        if organization_name:
-            statement = statement.where(
-                DevelopmentNotice.organization_name == organization_name,
-            )
-        if not refresh:
-            statement = statement.where(
-                ~or_(
-                    *(
-                        DevelopmentNotice.source_url.contains(marker)
-                        for marker in OFFICIAL_URL_MARKERS
-                    ),
-                ),
-            )
-        statement = statement.order_by(
-            DevelopmentNotice.notice_date.desc(),
-            DevelopmentNotice.id.desc(),
-        )
-        if limit is not None:
-            statement = statement.limit(limit)
-        rows = db.scalars(statement).all()
         return [
             NoticeSnapshot(
                 source_id=row.source_id,
@@ -752,16 +735,8 @@ def save_matches(results: list[MatchResult]) -> int:
     if not matched:
         return 0
 
-    with SessionLocal() as db:
-        rows = db.scalars(
-            select(DevelopmentNotice).where(
-                DevelopmentNotice.source_id.in_(matched.keys()),
-            ),
-        ).all()
-        for row in rows:
-            row.source_url = matched[row.source_id]  # type: ignore[assignment]
-        db.commit()
-    return len(matched)
+    with SessionLocal.begin() as db:
+        return save_official_notice_urls(db, matched)
 
 
 def main() -> None:

@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from .db import SessionLocal
 from .models import Region
-from .repositories.population_repository import save_population
+from .services.population_sync_service import save_local_population_result
 from .sync_population_history import parse_age, parse_rows, parse_summary
 
 
@@ -100,8 +100,8 @@ def main() -> None:
         args.summary_csv,
         args.age_csv,
     )
-    with SessionLocal() as db:
-        saved_count = save_population(db, result)
+    with SessionLocal.begin() as db:
+        saved_count = save_local_population_result(db, result)
 
     print(f"{args.stats_ym}: {saved_count}개 행정동 저장")
     print(f"GeoJSON과 매칭되지 않은 행정동: {missing_count}개")

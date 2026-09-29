@@ -3,13 +3,15 @@ from datetime import datetime, timezone
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.db import Base, get_db
 from app.main import app
 from app.models import DevelopmentNotice, Facility
+from app.services.development_sync_service import replace_development_notices
 from app.sync_vworld_facilities import REQUIRED_TRANSIT_STATIONS, validate_transit_coverage
 
 
@@ -208,6 +210,70 @@ class ServiceLayerApiTests(unittest.TestCase):
         self.assertEqual(
             response.json()["detail"], "실시간 원천 API 프록시는 비활성화되어 있습니다."
         )
+
+    def test_development_sync_rolls_back_the_whole_business_unit(self):
+        fetched_at = datetime.now(timezone.utc)
+        with self.sessions.begin() as db:
+            db.add(DevelopmentNotice(
+                source="GIMHAE_UPIS", source_id="existing", notice_number="2025-1",
+                title="기존 고시", notice_type_code="A", notice_type="고시",
+                notice_date="2025-01-01", stage="ACTIVE", stage_label="진행",
+                source_url="https://example.com/existing", fetched_at=fetched_at,
+                is_active=True,
+            ))
+
+        with self.assertRaisesRegex(RuntimeError, "강제 실패"):
+            with self.sessions.begin() as db:
+                replace_development_notices(
+                    db,
+                    from_date="2025-01-01",
+                    to_date="2025-12-31",
+                    notices=[{
+                        "source_id": "new",
+                        "notice_number": "2025-2",
+                        "title": "신규 고시",
+                        "notice_type_code": "A",
+                        "notice_type": "고시",
+                        "notice_date": "2025-02-01",
+                        "organization_code": "48250",
+                        "organization_name": "김해시",
+                        "summary": "",
+                        "stage": "ACTIVE",
+                        "stage_label": "진행",
+                        "source_url": "https://example.com/new",
+                        "fetched_at": fetched_at,
+                    }],
+                )
+                raise RuntimeError("강제 실패")
+
+        with self.sessions() as db:
+            existing = db.scalar(
+                select(DevelopmentNotice).where(
+                    DevelopmentNotice.source_id == "existing",
+                ),
+            )
+            new_row = db.scalar(
+                select(DevelopmentNotice).where(
+                    DevelopmentNotice.source_id == "new",
+                ),
+            )
+            self.assertIsNotNone(existing)
+            self.assertTrue(existing.is_active)
+            self.assertIsNone(new_row)
+
+    def test_database_error_response_hides_internal_details(self):
+        with patch(
+            "app.api.population.read_stored_population",
+            side_effect=SQLAlchemyError("secret database detail"),
+        ):
+            response = self.client.get("/api/population/regions")
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(
+            response.json(),
+            {"detail": "데이터를 처리하는 중 오류가 발생했습니다."},
+        )
+        self.assertNotIn("secret", response.text)
 
 
 if __name__ == "__main__":

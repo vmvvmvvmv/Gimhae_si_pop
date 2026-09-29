@@ -3,8 +3,8 @@ import asyncio
 
 from .core.config import MOIS_SERVICE_KEY
 from .db import SessionLocal
-from .repositories.population_repository import save_population
 from .services.mois_client import MoisClient
+from .services.population_sync_service import save_local_population_result
 from .services.population_service import (
     PopulationLevel,
     get_region_population,
@@ -27,8 +27,8 @@ async def sync_population(
         month,
     )
 
-    with SessionLocal() as db:
-        saved_count = save_population(db, result)
+    with SessionLocal.begin() as db:
+        saved_count = save_local_population_result(db, result)
 
     level_name = "행정동" if level == "admin" else "법정동"
     print(f"{year}년 {month}월 {level_name} 인구 데이터 동기화 완료")
