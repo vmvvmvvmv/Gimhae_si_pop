@@ -48,7 +48,7 @@ def import_areas(
     )
     saved_count = 0
 
-    with SessionLocal() as db:
+    with SessionLocal.begin() as db:
         for feature in geojson.get("features", []):
             properties = feature.get("properties", {})
             region_code = str(properties.get(code_key, "")).strip()
@@ -84,8 +84,6 @@ def import_areas(
             row.area_km2 = area_km2
             row.source = source
             row.fetched_at = utc_now()
-
-        db.commit()
 
     return saved_count
 

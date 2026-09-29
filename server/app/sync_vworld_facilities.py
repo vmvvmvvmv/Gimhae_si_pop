@@ -22,7 +22,7 @@ from .facility_quality import (
     is_passenger_transit,
 )
 from .models import Region
-from .repositories.facility_repository import upsert_facilities
+from .services.facility_sync_service import save_facility_snapshot
 
 
 VWORLD_SEARCH_URL = "https://api.vworld.kr/req/search"
@@ -431,8 +431,8 @@ async def sync_categories(categories: tuple[str, ...]) -> None:
     Base.metadata.create_all(bind=engine)
     for category in categories:
         facilities = await collect_category(category)
-        with SessionLocal() as db:
-            count = upsert_facilities(
+        with SessionLocal.begin() as db:
+            count = save_facility_snapshot(
                 db,
                 facilities,
                 source="VWORLD",

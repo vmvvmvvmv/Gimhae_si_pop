@@ -1,7 +1,7 @@
 import argparse
 
 from .db import SessionLocal
-from .repositories.population_repository import save_national_area
+from .services.population_sync_service import save_national_area_result
 
 
 def main() -> None:
@@ -17,18 +17,21 @@ def main() -> None:
     if args.area_km2 <= 0:
         raise ValueError("면적은 0보다 커야 합니다.")
 
-    with SessionLocal() as db: # SQLite DB 연결
-        row = save_national_area( #Resposity 함수 호출 후 데이터 저장
+    with SessionLocal.begin() as db: # SQLite DB 연결
+        row = save_national_area_result(
             db=db,
             year=args.year,
             area_km2=args.area_km2,
             source=args.source,
         )
+        saved_year = row.year
+        saved_area_km2 = row.area_km2
+        saved_source = row.source
 
     print(
-        f"저장 완료 - {row.year}년: "
-        f"{row.area_km2:,.4f}km² "
-        f"(출처: {row.source})",
+        f"저장 완료 - {saved_year}년: "
+        f"{saved_area_km2:,.4f}km² "
+        f"(출처: {saved_source})",
     )
 
 

@@ -4,12 +4,12 @@ from datetime import datetime
 
 from .core.config import MOIS_SERVICE_KEY
 from .db import SessionLocal
-from .repositories.population_repository import save_national_population
 from .services.mois_client import MoisClient
 from .services.national_population_service import (
     fetch_national_population,
     validate_national_result,
 )
+from .services.population_sync_service import save_national_population_result
 
 
 def month_sequence(from_year: int, from_month: int, to_year: int, to_month: int):
@@ -41,8 +41,8 @@ async def sync(args: argparse.Namespace) -> None:
             print(f"실패 - {stats_ym}: {error}")
             continue
 
-        with SessionLocal() as db:
-            save_national_population(db, stats_ym, result.population)
+        with SessionLocal.begin() as db:
+            save_national_population_result(db, stats_ym, result.population)
         saved_count += 1
         print(
             f"저장 완료 - {stats_ym}: "
