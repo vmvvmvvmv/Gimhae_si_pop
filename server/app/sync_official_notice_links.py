@@ -63,6 +63,33 @@ class MatchResult:
     error: str | None = None
 
 
+# 오래된 고시는 토지이음 상세 원문이 남아 있어도 검색 목록에서 누락되는 경우가
+# 있습니다. 상세 화면의 고시번호·날짜·제목·기관을 직접 대조한 건만 보관합니다.
+REVIEWED_EUM_CANDIDATES = (
+    OfficialCandidate(
+        url="https://www.eum.go.kr/web/gs/gv/gvGosiDet.jsp?seq=276640",
+        notice_number="2009-257",
+        notice_date="2009-05-21",
+        title="김해 삼어지구 도시개발사업 개발계획 변경 및 실시계획인가 고시",
+        organization_name="경상남도",
+    ),
+    OfficialCandidate(
+        url="https://www.eum.go.kr/web/gs/gv/gvGosiDet.jsp?seq=303226",
+        notice_number="2011-303",
+        notice_date="2011-07-28",
+        title="김해 부봉지구 도시개발사업개발계획 변경 및 실시계획 인가 고시",
+        organization_name="경상남도",
+    ),
+    OfficialCandidate(
+        url="https://www.eum.go.kr/web/gs/gv/gvGosiDet.jsp?seq=327925",
+        notice_number="2013-496",
+        notice_date="2013-10-31",
+        title="김해 GoldenRoot일반산업단지 관리기본계획(변경) 승인 및 지형도면 고시",
+        organization_name="경상남도",
+    ),
+)
+
+
 class OfficialNoticeSearchParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -393,6 +420,13 @@ async def find_official_link(
     delay_seconds: float,
 ) -> MatchResult:
     errors: list[str] = []
+
+    reviewed_candidate = choose_exact_candidate(
+        notice,
+        list(REVIEWED_EUM_CANDIDATES),
+    )
+    if reviewed_candidate:
+        return MatchResult(notice.source_id, reviewed_candidate.url)
 
     if normalize_organization(notice.organization_name) == "김해시":
         try:
