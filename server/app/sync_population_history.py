@@ -13,7 +13,7 @@ from sqlalchemy import select
 
 from .db import SessionLocal
 from .models import Region
-from .repositories.population_repository import save_population
+from .services.population_sync_service import save_local_population_result
 
 
 JUMIN_BASE_URL = "https://jumin.mois.go.kr"
@@ -218,8 +218,8 @@ def sync_month(
         "items": items,
         "source": "MOIS_WEB",
     }
-    with SessionLocal() as db:
-        saved_count = save_population(db, result)
+    with SessionLocal.begin() as db:
+        saved_count = save_local_population_result(db, result)
     return saved_count, missing_count
 
 

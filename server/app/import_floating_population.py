@@ -117,7 +117,7 @@ def import_rows(
     saved_count = 0
     skipped_count = 0
 
-    with SessionLocal() as db:
+    with SessionLocal.begin() as db:
         for (region_code, stats_ym), values in grouped.items():
             region = db.scalar(
                 select(Region).where(
@@ -153,8 +153,6 @@ def import_rows(
             floating.source = "GIMHAE_PUBLIC_DATA_15109694"
             floating.note = "원자료 행 기준 월별 평균"
             saved_count += 1
-
-        db.commit()
 
     print(f"지역 코드 불일치로 건너뛴 조합 수: {skipped_count}")
     return len(rows), saved_count

@@ -62,5 +62,6 @@ def upsert_facilities(
         row.fetched_at = item["fetched_at"]  # type: ignore[assignment]
         saved_count += 1
 
-    db.commit()
+    # 커밋은 동기화 서비스의 업무 단위에서 수행합니다.
+    db.flush()
     return saved_count

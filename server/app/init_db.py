@@ -53,7 +53,7 @@ def calculate_area_m2(
 def seed_regions() -> int:
     inserted_count = 0
 
-    with SessionLocal() as db:
+    with SessionLocal.begin() as db:
         for level, geojson_path in REGION_FILES:
             if not geojson_path.exists():
                 raise FileNotFoundError(f"GeoJSON 파일을 찾을 수 없습니다: {geojson_path}")
@@ -111,8 +111,6 @@ def seed_regions() -> int:
                     ),
                 )
                 inserted_count += 1
-
-        db.commit()
 
     return inserted_count
 

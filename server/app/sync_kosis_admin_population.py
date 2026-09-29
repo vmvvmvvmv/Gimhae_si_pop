@@ -10,7 +10,9 @@ from dotenv import load_dotenv
 
 from .db import Base, SessionLocal, engine
 from .inspect_kosis_table import parse_kosis_response
-from .repositories.population_repository import save_national_admin_population
+from .services.population_sync_service import (
+    save_national_admin_population_result,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -102,8 +104,8 @@ def sync_month(stats_ym: str) -> tuple[int, int]:
         raise RuntimeError(f"{stats_ym} 전국 읍면동 인구가 조회되지 않았습니다.")
 
     Base.metadata.create_all(bind=engine)
-    with SessionLocal() as db:
-        count = save_national_admin_population(db, stats_ym, items)
+    with SessionLocal.begin() as db:
+        count = save_national_admin_population_result(db, stats_ym, items)
     return len(rows), count
 
 

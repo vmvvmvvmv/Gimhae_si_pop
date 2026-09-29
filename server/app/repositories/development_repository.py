@@ -18,7 +18,6 @@ def deactivate_development_notices_in_range(
     ).all()
     for row in rows:
         row.is_active = False
-    db.commit()
 
 
 def upsert_development_notices(
@@ -72,7 +71,8 @@ def upsert_development_notices(
         row.is_active = True
         row.fetched_at = item["fetched_at"]  # type: ignore[assignment]
 
-    db.commit()
+    # 커밋은 이 저장소를 호출한 서비스의 업무 단위에서 수행합니다.
+    db.flush()
     return len(notices)
 
 
@@ -99,3 +99,58 @@ def get_development_notices(
         DevelopmentNotice.id.desc(),
     ).limit(limit)
     return list(db.scalars(statement).all())
+
+
+def get_development_notices_for_official_matching(
+    db: Session,
+    *,
+    official_url_markers: tuple[str, ...],
+    limit: int | None,
+    notice_number: str | None,
+    organization_name: str | None,
+    refresh: bool,
+) -> list[DevelopmentNotice]:
+    statement = select(DevelopmentNotice).where(
+        DevelopmentNotice.is_active.is_(True),
+    )
+    if notice_number:
+        statement = statement.where(
+            DevelopmentNotice.notice_number == notice_number,
+        )
+    if organization_name:
+        statement = statement.where(
+            DevelopmentNotice.organization_name == organization_name,
+        )
+    if not refresh:
+        statement = statement.where(
+            ~or_(
+                *(
+                    DevelopmentNotice.source_url.contains(marker)
+                    for marker in official_url_markers
+                ),
+            ),
+        )
+    statement = statement.order_by(
+        DevelopmentNotice.notice_date.desc(),
+        DevelopmentNotice.id.desc(),
+    )
+    if limit is not None:
+        statement = statement.limit(limit)
+    return list(db.scalars(statement).all())
+
+
+def update_development_notice_urls(
+    db: Session,
+    urls_by_source_id: dict[str, str],
+) -> int:
+    if not urls_by_source_id:
+        return 0
+    rows = db.scalars(
+        select(DevelopmentNotice).where(
+            DevelopmentNotice.source_id.in_(urls_by_source_id),
+        ),
+    ).all()
+    for row in rows:
+        row.source_url = urls_by_source_id[row.source_id]
+    db.flush()
+    return len(rows)

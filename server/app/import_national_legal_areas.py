@@ -26,7 +26,7 @@ def import_legal_areas(
     )
     processed_count = 0
 
-    with SessionLocal() as db:
+    with SessionLocal.begin() as db:
         for feature in geojson.get("features", []):
             properties = feature.get("properties", {})
             region_code = str(properties.get("emd_cd", "")).strip()
@@ -64,8 +64,6 @@ def import_legal_areas(
             row.source = "VWORLD"
             row.fetched_at = utc_now()
             processed_count += 1
-
-        db.commit()
 
     return processed_count
 
