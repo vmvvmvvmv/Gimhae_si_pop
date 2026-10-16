@@ -124,7 +124,7 @@ export default function OfficialNoticeWindow({
           <div>
             <span className="official-notice-eyebrow">발행기관 공식 고시</span>
             <h2 id="official-notice-window-title">고시공고 원문</h2>
-            <p>번호·날짜·제목·발행기관을 대조한 공식 원문만 연결합니다.</p>
+            <p>번호와 날짜, 제목, 발행기관이 일치하는 공식 원문만 모았습니다.</p>
           </div>
           <button
             type="button"
@@ -214,12 +214,12 @@ export default function OfficialNoticeWindow({
                       {notice.title}
                     </strong>
                   )}
-                  <p>{notice.summary || '상세 요약은 공식 원문에서 확인해 주세요.'}</p>
+                  <p>{notice.summary || '자세한 내용은 공식 원문에서 확인해 주세요.'}</p>
                   {!verified && (
                     <p className="official-notice-status-note">
                       <strong>{notice.officialLinkStatusLabel}</strong>
                       <span>{notice.officialLinkMessage}</span>
-                      <small>구역 경계는 VWorld, 고시 정보는 김해 UPIS 자료입니다.</small>
+                      <small>구역 경계는 VWorld에서, 고시 정보는 김해 UPIS에서 가져왔습니다.</small>
                     </p>
                   )}
                   <div className="official-notice-item-meta">
@@ -239,7 +239,7 @@ export default function OfficialNoticeWindow({
 
         <footer className="official-notice-footer">
           <span>
-            {filteredNotices.length.toLocaleString()}건 표시 · 제목과 고시번호가 정확히 대조된 원문만 연결합니다.
+            {filteredNotices.length.toLocaleString()}건 · 제목과 고시번호가 일치하는 원문만 연결했습니다.
           </span>
           <button type="button" onClick={onClose}>
             창 닫기
