@@ -16,9 +16,19 @@ class RegionNotFound(Exception):
     pass
 
 
+def _valid_stats_ym(value: str) -> bool:
+    return (
+        len(value) == 6
+        and value.isascii()
+        and value.isdigit()
+        and 1 <= int(value[4:]) <= 12
+    )
+
+
 def read_stored_population(
     db: Session, level: PopulationLevel, year: int, month: int
 ) -> dict[str, Any]:
+    # 서비스는 DB 조회 결과를 화면에 전달할 형태로 정리하고, 없는 달도 구분합니다.
     result = get_population(db, level, year, month)
     if result is not None:
         return result
@@ -47,6 +57,8 @@ def read_availability(db: Session) -> dict[str, Any]:
 def read_comparison(
     db: Session, level: PopulationLevel, region_code: str, base_ym: str, target_ym: str
 ) -> dict[str, Any]:
+    if not _valid_stats_ym(base_ym) or not _valid_stats_ym(target_ym):
+        raise ValueError("기준월과 비교월은 유효한 YYYYMM 형식이어야 합니다.")
     if base_ym == target_ym:
         raise ValueError("기준월과 비교월은 서로 달라야 합니다.")
     result = get_population_comparison(db, level, region_code, base_ym, target_ym)

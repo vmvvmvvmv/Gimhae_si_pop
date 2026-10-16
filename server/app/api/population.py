@@ -1,7 +1,7 @@
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -11,6 +11,11 @@ from ..services.mois_proxy_service import (
     fetch_live_population,
 )
 from ..services.population_service import PopulationLevel
+from ..services.population_export_service import (
+    NoExportData,
+    population_export_csv,
+    prepare_population_export,
+)
 from ..services.population_query_service import (
     RegionNotFound,
     read_availability,
@@ -21,6 +26,69 @@ from ..services.population_query_service import (
 
 
 router = APIRouter()
+
+
+def _read_export(
+    db: Session,
+    level: PopulationLevel,
+    scope: Literal["region", "month"],
+    fields: list[str],
+    region_code: str | None,
+    from_ym: str | None,
+    to_ym: str | None,
+    stats_ym: str | None,
+    region_codes: list[str] | None = None,
+) -> dict:
+    try:
+        return prepare_population_export(
+            db, level, scope, fields, region_code, from_ym, to_ym, stats_ym,
+            region_codes,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except NoExportData as error:
+        raise HTTPException(
+            status_code=404,
+            detail="선택한 범위에 저장된 인구 자료가 없습니다.",
+        ) from error
+
+
+@router.get("/api/population/export/preview")
+def population_export_preview(
+    level: PopulationLevel = Query("admin"),
+    scope: Literal["region", "month"] = Query(...),
+    fields: list[str] = Query(...),
+    region_code: str | None = Query(None, min_length=8, max_length=10, pattern=r"^\d{8,10}$"),
+    from_ym: str | None = Query(None),
+    to_ym: str | None = Query(None),
+    stats_ym: str | None = Query(None),
+    region_codes: list[str] | None = Query(None),
+    db: Session = Depends(get_db),
+) -> dict:
+    export = _read_export(db, level, scope, fields, region_code, from_ym, to_ym, stats_ym, region_codes)
+    return {"columns": export["columns"], "rows": export["rows"][:5], "count": export["count"]}
+
+
+@router.get("/api/population/export.csv")
+def download_population_export(
+    level: PopulationLevel = Query("admin"),
+    scope: Literal["region", "month"] = Query(...),
+    fields: list[str] = Query(...),
+    region_code: str | None = Query(None, min_length=8, max_length=10, pattern=r"^\d{8,10}$"),
+    from_ym: str | None = Query(None),
+    to_ym: str | None = Query(None),
+    stats_ym: str | None = Query(None),
+    region_codes: list[str] | None = Query(None),
+    db: Session = Depends(get_db),
+) -> Response:
+    export = _read_export(db, level, scope, fields, region_code, from_ym, to_ym, stats_ym, region_codes)
+    period = stats_ym if scope == "month" else f"{from_ym}-{to_ym}"
+    filename = f"gimhae_population_{level}_{scope}_{period}.csv"
+    return Response(
+        content=population_export_csv(export),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 def live_proxy_http_error(error: LiveProxyError, *, age: bool) -> HTTPException:
@@ -82,6 +150,7 @@ async def region_population(
     month: int = Query(12, ge=1, le=12),
     db: Session = Depends(get_db),
 ) -> JSONResponse:
+    # API 계층은 URL 입력을 받고 응답을 돌려줍니다. 조회 규칙은 서비스 계층에 둡니다.
     return JSONResponse(
         content=read_stored_population(db, level, year, month),
         media_type="application/json; charset=utf-8",
