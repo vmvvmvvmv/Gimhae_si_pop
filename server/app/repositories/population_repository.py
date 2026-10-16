@@ -14,6 +14,7 @@ from ..models import (
     PopulationMonthly,
     Region,
 )
+from ..services.national_admin_matching import match_population_code, population_name_index
 from .area_repository import get_area_reference
 
 
@@ -120,10 +121,6 @@ def save_national_admin_population(
     return saved_count
 
 
-def _normalize_region_name(value: str) -> str:
-    return "".join(value.split()).replace("·", "")
-
-
 def get_similar_admin_density(
     db: Session,
     region_code: str,
@@ -221,37 +218,28 @@ def get_similar_admin_density(
         select(NationalAdministrativeArea).where(*candidate_conditions),
     ).all()
 
-    candidate_codes = [candidate.region_code for candidate in candidates]
-    candidate_names = [candidate.region_name for candidate in candidates]
     population_rows = db.scalars(
         select(NationalAdministrativePopulationMonthly).where(
-            or_(
-                NationalAdministrativePopulationMonthly.region_code.in_(
-                    candidate_codes,
-                ),
-                NationalAdministrativePopulationMonthly.region_name.in_(
-                    candidate_names,
-                ),
-            ),
             NationalAdministrativePopulationMonthly.stats_ym == stats_ym,
         ),
-    ).all() if candidate_codes else []
+    ).all() if candidates else []
     population_by_code = {
         row.region_code: row for row in population_rows
     }
-    population_by_name = {
-        _normalize_region_name(row.region_name): row
-        for row in population_rows
-    }
+    population_codes = set(population_by_code)
+    population_names = population_name_index(
+        (row.region_code, row.region_name) for row in population_rows
+    )
 
     matches: list[dict[str, Any]] = []
     for candidate in candidates:
-        population_row = (
-            population_by_code.get(candidate.region_code)
-            or population_by_name.get(
-                _normalize_region_name(candidate.region_name),
-            )
+        matched_code = match_population_code(
+            candidate.region_code,
+            candidate.region_name,
+            population_codes,
+            population_names,
         )
+        population_row = population_by_code.get(matched_code)
         area_difference_km2 = candidate.area_km2 - target_area_km2
         area_difference_rate = (
             round(area_difference_km2 / target_area_km2 * 100, 2)
@@ -348,6 +336,7 @@ def _density_snapshot(
 
 
 def get_population_availability(db: Session) -> dict[str, Any]:
+    # 저장된 지역 수와 활성 지역 수를 월마다 비교해 '완료/일부 적재'를 판별합니다.
     active_region_counts = dict(
         db.execute(
             select(Region.level, func.count(Region.id))
