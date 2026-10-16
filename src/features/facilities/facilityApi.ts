@@ -36,6 +36,9 @@ export interface FacilityItem {
   phone: string | null
   source: string
   fetchedAt: string | null
+  imageUrl?: string | null
+  imageSourceUrl?: string | null
+  imageSourceName?: string | null
 }
 
 export interface FacilityResponse {
