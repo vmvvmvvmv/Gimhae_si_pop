@@ -9,6 +9,8 @@
 - `public/data/`: 브라우저에서 사용하는 GeoJSON 경계 데이터
 - `docs/architecture.md`: 데이터 흐름과 책임 분리 문서
 - `docs/project-handoff.md`: 다른 채팅이나 개발 환경에서 작업을 이어가기 위한 현재 상태·실행법·남은 과제
+- `docs/beginner-code-guide.md`: 처음 보는 사람을 위한 코드 읽는 순서와 폴더·함수 역할
+- `docs/deployment-preflight.md`: Docker·DB·지도 키·공개 전 점검 순서
 
 ## 실행
 
@@ -28,6 +30,21 @@ cd server
 uvicorn app.main:app --reload --port 8000
 ```
 
+백엔드 전체 테스트는 일반 CMD에서 다음처럼 실행합니다.
+
+```bat
+cd /d "C:\Users\User\Documents\ChatGPT\Gimhae_si_Map\server"
+.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+Windows에서 로컬 소켓 생성을 막는 제한된 실행 환경에서는 FastAPI 테스트
+클라이언트가 멈출 수 있습니다. 이 경우 테스트 실패가 아니라 실행 환경의
+제한인지 확인하고, 일반 CMD에서 다시 실행합니다.
+
+개발자 도구 콘솔에는 첫 화면의 `조회 기간 준비`, `첫 인구 데이터 준비`,
+`지도 사용 가능` 시간이 밀리초로 기록됩니다. 브라우저 Performance 패널에서는
+`gimhae:`로 시작하는 마크를 찾아 초기 로딩 병목을 비교할 수 있습니다.
+
 필요하면 최초 1회 지역 데이터를 초기화합니다.
 
 ```powershell
@@ -36,6 +53,17 @@ python -m app.init_db
 
 전국 월별 주민등록 인구는 행정안전부 API에서 받아 SQLite에 저장합니다.
 처음 한 번 과거 구간을 동기화한 뒤, 최신 월을 주기적으로 추가하면 됩니다.
+
+저장 상태는 아래 명령으로 읽기 전용 점검할 수 있습니다. 행정·법정동 인구의
+빈 월, 월별 11개 연령대 누락, 전국 월별 인구·연도별 면적 및 전국 행정동
+비교 인구의 미연결 건수를 보여줍니다. 기본 범위는 각 유형에서 실제로
+저장된 첫 달부터 마지막 달까지이며, 행정구역 변경 전후의 빈 월은 확인이
+필요한 후보로 해석합니다. DB는 수정하지 않습니다.
+
+```text
+cd /d C:\Users\User\Documents\ChatGPT\Gimhae_si_Map\server
+.venv\Scripts\python.exe -m app.audit_population_coverage --from-ym 202501 --to-ym 202512 --limit 30
+```
 
 ```text
 cd /d C:\Users\User\Documents\ChatGPT\Gimhae_si_Map\server
@@ -68,6 +96,11 @@ cd /d C:\Users\User\Documents\ChatGPT\Gimhae_si_Map\server
 보관하고, 계산한 면적을 SQLite의 `national_administrative_area`에 저장합니다.
 기존 연도를 다시 수집할 때만 `--force`를 추가합니다.
 
+SGIS 면적 경계의 지역코드(8자리)와 KOSIS 전국 읍면동 인구의 지역코드(10자리)는
+직접 일치하지 않습니다. 유사 면적 비교와 누락 점검은 고유한 전체 지역명으로
+대조하며 `제1동/1동`, 구두점, 일부 상위 시·구 표기 차이만 보수적으로 보완합니다.
+여러 인구 지역으로 갈라지는 면적 구역은 추정 합산하지 않고 미연결로 남깁니다.
+
 행정구역 개편 참고용 하천망과 교량은 VWorld에서 갱신합니다. 첫 명령은
 김해시 주변의 공식 하천망 면 데이터를 `public/data/gimhae_waterways.geojson`에
 저장하고, 두 번째 명령은 교량 위치를 SQLite 시설 테이블에 저장합니다.
@@ -78,6 +111,16 @@ cd /d C:\Users\User\Documents\ChatGPT\Gimhae_si_Map\server
 .venv\Scripts\python.exe -m app.sync_vworld_development_areas
 .venv\Scripts\python.exe -m app.sync_vworld_facilities --category BRIDGE
 .venv\Scripts\python.exe -m app.sync_vworld_facilities --category PARK
+```
+
+경계·하천·도로·개발구역 원본은 DB 계산과 검증에 그대로 쓰고, 브라우저는
+좌표 수를 줄인 `*.render.geojson`을 읽는다. `npm run dev`와 `npm run build`는
+누락된 지도 표시용 파일을 시작 전에 생성한다. 기존 파일이 원본에서 생성한
+결과와 다르면 덮어쓰지 않고 중단하므로, 원본을 갱신한 뒤에는 결과 파일을
+확인하고 프로젝트 루트에서 다음 명령으로 다시 만든다.
+
+```text
+npm run optimize:geojson
 ```
 
 하천망은 김해시 행정동 전체 경계로 잘라 저장합니다. 하천은 생활권의 물리적
