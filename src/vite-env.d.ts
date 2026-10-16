@@ -9,7 +9,8 @@ declare global {
   }
 
   interface NaverMapData {
-    addGeoJson(data: unknown): void
+    addGeoJson(data: unknown): NaverFeature[]
+    removeFeature(feature: NaverFeature): string | number
     setStyle(
       style: (feature: NaverFeature) => Record<string, unknown>,
     ): void
@@ -21,11 +22,16 @@ declare global {
       feature: NaverFeature,
       style: Record<string, unknown>,
     ): void
-    revertStyle(): void
+    revertStyle(feature?: NaverFeature): void
   }
 
   interface NaverMapInstance {
     data: NaverMapData
+    morph(
+      coordinate: unknown,
+      zoom?: number,
+      transitionOptions?: Record<string, unknown>,
+    ): void
     destroy?(): void
   }
 
@@ -41,6 +47,38 @@ declare global {
     setContent(content: string): void
     open(map: NaverMapInstance, coord: unknown): void
     close(): void
+  }
+
+  interface NaverPanorama {
+    getLocation(): {
+      coord: {
+        lat(): number
+        lng(): number
+      }
+    } | null
+    setPov(pov: Record<string, number>): void
+    setVisible(visible: boolean): void
+  }
+
+  interface NaverGeocodeResponse {
+    v2: {
+      addresses: Array<{
+        roadAddress?: string
+        jibunAddress?: string
+        x: string
+        y: string
+      }>
+    }
+  }
+
+  interface NaverMapService {
+    Status: {
+      OK: string
+    }
+    geocode(
+      options: { query: string },
+      callback: (status: string, response?: NaverGeocodeResponse) => void,
+    ): void
   }
 
   interface NaverMapsNamespace {
@@ -59,11 +97,16 @@ declare global {
     TrafficLayer: new (
       options?: Record<string, unknown>,
     ) => NaverTrafficLayer
+    Panorama?: new (
+      element: HTMLElement,
+      options: Record<string, unknown>,
+    ) => NaverPanorama
+    Service?: NaverMapService
     Event: {
       addListener(
         target: unknown,
         eventName: string,
-        handler: () => void,
+        handler: (...args: unknown[]) => void,
       ): unknown
       clearInstanceListeners(target: unknown): void
     }

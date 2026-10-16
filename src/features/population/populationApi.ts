@@ -189,6 +189,7 @@ export interface SimilarDensityResponse {
   }
 }
 
+// 이 파일은 브라우저와 FastAPI 사이의 통신만 담당합니다. 화면 상태는 DashboardPage가 관리합니다.
 export async function fetchPopulation(
   level: PopulationLevel,
   year: number,
@@ -234,6 +235,7 @@ export function fetchAdminPopulation(
 }
 
 export async function fetchPopulationAvailability(): Promise<PopulationAvailabilityResponse> {
+  // 실제 DB에 저장된 월을 먼저 알아야 빈 달을 기본값으로 선택하지 않습니다.
   const response = await fetch(`${API_BASE_URL}/population/availability`)
 
   if (!response.ok) {
