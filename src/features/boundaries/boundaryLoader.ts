@@ -29,6 +29,7 @@ const EPSG_5186 =
 
 proj4.defs('EPSG:5186', EPSG_5186)
 
+// 원본 경계 좌표계(EPSG:5186)를 NAVER 지도에 표시할 위경도(EPSG:4326)로 바꿉니다.
 function transformCoordinates(value: unknown): unknown {
   if (!Array.isArray(value)) {
     return value
@@ -81,10 +82,11 @@ export function normalizeBoundary(
 export async function loadBoundary(
   boundaryType: BoundaryType,
 ): Promise<GeoJsonCollection> {
+  // 인구 통계는 API에서, 경계 모양은 가벼운 표시용 GeoJSON 파일에서 가져옵니다.
   const path =
     boundaryType === 'administrative'
-      ? '/data/gimhae_hangjeongdong.geojson'
-      : '/data/Gimhae_si.geojson'
+      ? '/data/gimhae_hangjeongdong.render.geojson'
+      : '/data/Gimhae_si.render.geojson'
 
   const response = await fetch(path)
 
@@ -119,7 +121,7 @@ export function getRegionCode(
 }
 
 export async function loadWaterways(): Promise<GeoJsonCollection> {
-  const response = await fetch('/data/gimhae_waterways.geojson')
+  const response = await fetch('/data/gimhae_waterways.render.geojson')
 
   if (!response.ok) {
     throw new Error('하천망 GeoJSON 파일을 불러오지 못했습니다.')
@@ -129,7 +131,7 @@ export async function loadWaterways(): Promise<GeoJsonCollection> {
 }
 
 export async function loadMajorRoads(): Promise<GeoJsonCollection> {
-  const response = await fetch('/data/gimhae_major_roads.geojson')
+  const response = await fetch('/data/gimhae_major_roads.render.geojson')
 
   if (!response.ok) {
     throw new Error('주요 도로 GeoJSON 파일을 불러오지 못했습니다.')
@@ -139,7 +141,7 @@ export async function loadMajorRoads(): Promise<GeoJsonCollection> {
 }
 
 export async function loadDevelopmentAreas(): Promise<GeoJsonCollection> {
-  const response = await fetch('/data/gimhae_development_areas.geojson')
+  const response = await fetch('/data/gimhae_development_areas.render.geojson')
 
   if (!response.ok) {
     throw new Error('개발 관련 구역 GeoJSON 파일을 불러오지 못했습니다.')
