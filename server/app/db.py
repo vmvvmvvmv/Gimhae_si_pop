@@ -28,6 +28,7 @@ class Base(DeclarativeBase):
 
 
 def get_db() -> Generator[Session, None, None]:
+    # 요청마다 DB 세션을 하나 열고, 끝나면 반드시 닫습니다.
     db = SessionLocal()
     try:
         yield db
