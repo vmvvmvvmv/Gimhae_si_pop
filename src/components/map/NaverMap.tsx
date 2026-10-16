@@ -13,10 +13,14 @@ import type {
 } from '../../features/facilities/facilityApi'
 import type { DevelopmentNotice } from '../../features/development/developmentApi'
 import {
-  developmentFeatureContainsPoint,
+  getClickedDevelopmentFeatures,
   getDevelopmentAreaNotices,
-  getDevelopmentFeatureArea,
 } from '../../features/development/developmentMatching'
+import {
+  getBoundaryVisualStyle,
+  shouldShowMapHoverPreview,
+} from '../../features/map/mapPresentation'
+import { recordPerformanceMilestone } from '../../lib/performanceMetrics'
 
 interface SelectedRegion {
   name: string
@@ -24,9 +28,39 @@ interface SelectedRegion {
   type: BoundaryType
 }
 
+export type AddressSearchRequest =
+  | {
+      id: number
+      kind: 'address'
+      query: string
+    }
+  | {
+      id: number
+      kind: 'coordinate'
+      query: string
+      latitude: number
+      longitude: number
+      zoom?: number
+    }
+
+export interface AddressSearchResult {
+  status: 'success' | 'empty' | 'outside' | 'error'
+  title?: string
+  subtitle?: string
+  roadAddress?: string
+  jibunAddress?: string
+}
+
 interface NaverMapProps {
   boundaryType: BoundaryType
+  selectedRegion?: SelectedRegion | null
+  comparedRegionCode?: string
   onSelectRegion: (region: SelectedRegion) => void
+  onSelectFacility?: (facility: FacilityItem) => void
+  onSelectDevelopmentAreas?: (sourceIds: string[]) => void
+  addressSearchRequest?: AddressSearchRequest | null
+  onAddressSearchResult?: (result: AddressSearchResult) => void
+  onMapInteraction?: () => void
   populationItems?: AdminPopulationRegion[]
   facilityItems?: FacilityItem[]
   showBoundaryFill?: boolean
@@ -36,17 +70,21 @@ interface NaverMapProps {
   showMajorRoads?: boolean
   showRoadTraffic?: boolean
   developmentAreas?: GeoJsonCollection
+  visibleDevelopmentAreaIds?: ReadonlySet<string>
   showDevelopmentAreas?: boolean
   developmentNotices?: DevelopmentNotice[]
 }
 
 let naverScriptPromise: Promise<void> | null = null
+let naverGeocoderScriptPromise: Promise<void> | null = null
 const EMPTY_POPULATION_ITEMS: AdminPopulationRegion[] = []
 const EMPTY_FACILITY_ITEMS: FacilityItem[] = []
 const EMPTY_DEVELOPMENT_NOTICES: DevelopmentNotice[] = []
 const WATERWAY_FILL_COLOR = '#a5d1f2'
 const WATERWAY_STROKE_COLOR = '#a5d1f2'
 const BOUNDARY_STROKE_COLOR = '#174a8c'
+const SIX_LANE_ROAD_COLOR = '#F8D39A'
+const EIGHT_PLUS_LANE_ROAD_COLOR = '#E6A65A'
 const DEVELOPMENT_COLORS: Record<string, string> = {
   INDUSTRIAL_COMPLEX: '#f97316',
   DISTRICT_PLAN: '#16a34a',
@@ -111,8 +149,8 @@ function renderDevelopmentNotices(notices: DevelopmentNotice[]): string {
   if (!notices.length) {
     return (
       '<div class="development-notice-preview empty">' +
-        '<p>VWorld 공식 공간정보로 확인된 개발구역입니다.</p>' +
-        '<span>연결 가능한 김해 UPIS 고시가 없습니다.</span>' +
+        '<p>VWorld 공식 공간정보에 등록된 개발구역입니다.</p>' +
+        '<span>김해 UPIS에서 연결할 고시를 찾지 못했습니다.</span>' +
       '</div>'
     )
   }
@@ -194,21 +232,16 @@ function applyPopulationStyles(
   showBoundaryFill: boolean,
   showWaterways: boolean,
   showDevelopmentAreas: boolean,
+  visibleDevelopmentAreaIds: ReadonlySet<string> | undefined,
   showMajorRoads: boolean,
+  selectedRegionCode: string,
+  comparedRegionCode: string,
 ): void {
   const populationByCode = getDistributionValues(populationItems)
   const maximumPopulation = Math.max(
     ...populationByCode.values(),
     1,
   )
-  const fillColors = [
-    '#c8dcf2',
-    '#8db4dd',
-    '#578bc2',
-    '#2f66a9',
-    '#174a8c',
-  ]
-
   dataLayer.setStyle((feature: NaverFeature) => {
     const layer = feature.getProperty('__layer')
     if (layer === 'major-road-casing' || layer === 'major-road-core') {
@@ -216,29 +249,36 @@ function applyPopulationStyles(
       const isEightPlus = feature.getProperty('laneClass') === 'eight_plus'
       return {
         strokeColor: isCore
-          ? (isEightPlus ? '#ff8a29' : '#ffd166')
-          : '#293b48',
-        strokeOpacity: showMajorRoads ? 0.96 : 0,
+          ? (isEightPlus
+              ? EIGHT_PLUS_LANE_ROAD_COLOR
+              : SIX_LANE_ROAD_COLOR)
+          : '#65727d',
+        strokeOpacity: showMajorRoads ? (isCore ? 1 : 0.94) : 0,
         strokeWeight: showMajorRoads
-          ? (isCore ? (isEightPlus ? 3.3 : 2.7) : (isEightPlus ? 6 : 5))
+          ? (isCore ? (isEightPlus ? 3.7 : 3.1) : (isEightPlus ? 6.7 : 5.9))
           : 0,
+        strokeLineCap: 'round',
+        strokeLineJoin: 'round',
         clickable: false,
-        zIndex: isCore ? 51 : 50,
+        zIndex: isCore ? 41 : 40,
       }
     }
 
     if (layer === 'development-area') {
       const category = String(feature.getProperty('category') ?? '')
       const color = DEVELOPMENT_COLORS[category] ?? '#ef4444'
+      const areaSourceId = String(feature.getProperty('areaSourceId') ?? '')
+      const isVisible = showDevelopmentAreas &&
+        (!visibleDevelopmentAreaIds || visibleDevelopmentAreaIds.has(areaSourceId))
       return {
         fillColor: color,
-        fillOpacity: showDevelopmentAreas ? 0.25 : 0,
+        fillOpacity: isVisible ? 0.25 : 0,
         strokeColor: color,
-        strokeOpacity: showDevelopmentAreas ? 1 : 0,
-        strokeWeight: showDevelopmentAreas ? 2.4 : 0,
-        clickable: showDevelopmentAreas,
+        strokeOpacity: isVisible ? 1 : 0,
+        strokeWeight: isVisible ? 2.4 : 0,
+        clickable: isVisible,
         // 개발구역은 행정·법정동 경계선보다 위에서 클릭되어야 합니다.
-        zIndex: showDevelopmentAreas ? 60 : 0,
+        zIndex: isVisible ? 60 : 0,
       }
     }
 
@@ -274,25 +314,16 @@ function applyPopulationStyles(
     }
     const code = getRegionCode(properties, boundaryType)
     const population = populationByCode.get(code)
-    const ratio = population ? population / maximumPopulation : 0
-    const colorIndex = population
-      ? Math.min(
-          fillColors.length - 1,
-          Math.floor(ratio * fillColors.length),
-        )
-      : 0
-
-    return {
-      fillColor: fillColors[colorIndex],
-      fillOpacity: showBoundaryFill
-        ? (population ? 0.86 : 0.45)
-        : 0,
-      strokeColor: BOUNDARY_STROKE_COLOR,
-      strokeOpacity: 0.9,
-      strokeWeight: 1.4,
-      clickable: true,
-      zIndex: 10,
-    }
+    const isSelected = Boolean(selectedRegionCode) && code === selectedRegionCode
+    const isCompared = Boolean(comparedRegionCode) && code === comparedRegionCode
+    return getBoundaryVisualStyle({
+      population,
+      maximumPopulation,
+      showBoundaryFill,
+      showDevelopmentAreas,
+      isSelected,
+      isCompared,
+    })
   })
 }
 
@@ -313,8 +344,23 @@ function createMajorRoadOverlays(collection: GeoJsonCollection): GeoJsonCollecti
 }
 
 function loadNaverMaps(clientId: string): Promise<void> {
+  const loadGeocoder = (): Promise<void> => {
+    if (window.naver?.maps?.Service) return Promise.resolve()
+    if (naverGeocoderScriptPromise) return naverGeocoderScriptPromise
+
+    naverGeocoderScriptPromise = new Promise((resolve, reject) => {
+      const addonScript = document.createElement('script')
+      addonScript.src = 'https://oapi.map.naver.com/openapi/v3/maps-geocoder.js'
+      addonScript.async = true
+      addonScript.onload = () => resolve()
+      addonScript.onerror = () => reject(new Error('주소 검색 기능을 불러오지 못했습니다.'))
+      document.head.appendChild(addonScript)
+    })
+    return naverGeocoderScriptPromise
+  }
+
   if (window.naver?.maps) {
-    return Promise.resolve()
+    return loadGeocoder()
   }
 
   if (naverScriptPromise) {
@@ -329,7 +375,7 @@ function loadNaverMaps(clientId: string): Promise<void> {
       `?ncpKeyId=${encodeURIComponent(clientId)}`
 
     script.async = true
-    script.onload = () => resolve()
+    script.onload = () => void loadGeocoder().then(resolve, reject)
     script.onerror = () => {
       reject(new Error('네이버 지도 API를 불러오지 못했습니다.'))
     }
@@ -342,7 +388,14 @@ function loadNaverMaps(clientId: string): Promise<void> {
 
 export default function NaverMap({
   boundaryType,
+  selectedRegion,
+  comparedRegionCode = '',
   onSelectRegion,
+  onSelectFacility,
+  onSelectDevelopmentAreas,
+  addressSearchRequest,
+  onAddressSearchResult,
+  onMapInteraction,
   populationItems = EMPTY_POPULATION_ITEMS,
   facilityItems = EMPTY_FACILITY_ITEMS,
   showBoundaryFill = true,
@@ -352,23 +405,41 @@ export default function NaverMap({
   showMajorRoads = true,
   showRoadTraffic = false,
   developmentAreas,
+  visibleDevelopmentAreaIds,
   showDevelopmentAreas = false,
   developmentNotices = EMPTY_DEVELOPMENT_NOTICES,
 }: NaverMapProps) {
+  // DashboardPage가 선택·표시 조건을 전달하고, 지도 클릭은 콜백으로 되돌려줍니다.
+  // NAVER 지도 객체는 React 화면 상태와 달라 ref에 보관합니다.
   const mapElement = useRef<HTMLDivElement>(null)
   const mapRef = useRef<NaverMapInstance | null>(null)
   const dataLayerRef = useRef<NaverMapData | null>(null)
+  const loadedBoundaryRef = useRef<GeoJsonCollection | null>(null)
+  const waterwayFeaturesRef = useRef<NaverFeature[]>([])
+  const majorRoadFeaturesRef = useRef<NaverFeature[]>([])
   const loadedMajorRoadsRef = useRef<GeoJsonCollection | null>(null)
-  const facilityMarkersRef = useRef<NaverMarker[]>([])
+  const developmentAreaFeaturesRef = useRef<NaverFeature[]>([])
+  const loadedDevelopmentAreasRef = useRef<GeoJsonCollection | null>(null)
+  const facilityMarkersRef = useRef<Map<number, NaverMarker>>(new Map())
+  const addressSearchMarkerRef = useRef<NaverMarker | null>(null)
   const trafficLayerRef = useRef<NaverTrafficLayer | null>(null)
   const facilityInfoWindowRef = useRef<NaverInfoWindow | null>(null)
   const developmentInfoWindowRef = useRef<NaverInfoWindow | null>(null)
+  const developmentInfoPinnedRef = useRef(false)
   const onSelectRegionRef = useRef(onSelectRegion)
+  const onSelectFacilityRef = useRef(onSelectFacility)
+  const onSelectDevelopmentAreasRef = useRef(onSelectDevelopmentAreas)
+  const onAddressSearchResultRef = useRef(onAddressSearchResult)
   const populationItemsRef = useRef(populationItems)
+  const populationByCodeRef = useRef(getDistributionValues(populationItems))
+  const developmentAreasRef = useRef(developmentAreas)
+  const visibleDevelopmentAreaIdsRef = useRef(visibleDevelopmentAreaIds)
   const showBoundaryFillRef = useRef(showBoundaryFill)
   const showWaterwaysRef = useRef(showWaterways)
   const showDevelopmentAreasRef = useRef(showDevelopmentAreas)
   const showMajorRoadsRef = useRef(showMajorRoads)
+  const selectedRegionCodeRef = useRef(selectedRegion?.code ?? '')
+  const comparedRegionCodeRef = useRef(comparedRegionCode)
   const developmentNoticesRef = useRef(developmentNotices)
   const [status, setStatus] = useState('loading')
 
@@ -377,41 +448,89 @@ export default function NaverMap({
   }, [onSelectRegion])
 
   useEffect(() => {
+    onSelectFacilityRef.current = onSelectFacility
+  }, [onSelectFacility])
+
+  useEffect(() => {
+    onSelectDevelopmentAreasRef.current = onSelectDevelopmentAreas
+  }, [onSelectDevelopmentAreas])
+
+  useEffect(() => {
+    onAddressSearchResultRef.current = onAddressSearchResult
+  }, [onAddressSearchResult])
+
+  useEffect(() => {
     developmentNoticesRef.current = developmentNotices
   }, [developmentNotices])
+
+  useEffect(() => {
+    developmentAreasRef.current = developmentAreas
+  }, [developmentAreas])
+
+  useEffect(() => {
+    visibleDevelopmentAreaIdsRef.current = visibleDevelopmentAreaIds
+  }, [visibleDevelopmentAreaIds])
 
   useEffect(() => {
     trafficLayerRef.current?.setMap(showRoadTraffic ? mapRef.current : null)
   }, [showRoadTraffic, status])
 
   useEffect(() => {
-    if (
-      status === 'ready' &&
-      dataLayerRef.current &&
-      majorRoads &&
-      loadedMajorRoadsRef.current !== majorRoads
-    ) {
-      dataLayerRef.current.addGeoJson(createMajorRoadOverlays(majorRoads))
-      loadedMajorRoadsRef.current = majorRoads
-      applyPopulationStyles(
-        dataLayerRef.current,
-        boundaryType,
-        populationItemsRef.current,
-        showBoundaryFillRef.current,
-        showWaterwaysRef.current,
-        showDevelopmentAreasRef.current,
-        showMajorRoads,
-      )
+    const dataLayer = dataLayerRef.current
+    if (!dataLayer || status !== 'ready' || !majorRoads) return
+    if (loadedMajorRoadsRef.current === majorRoads) return
+
+    // 긴 도로 선을 토글마다 삭제·재생성하면 지도가 멈춥니다.
+    // 데이터가 바뀔 때만 올리고 ON/OFF는 아래 스타일 갱신에서 처리합니다.
+    for (const feature of majorRoadFeaturesRef.current) {
+      dataLayer.removeFeature(feature)
     }
-  }, [boundaryType, majorRoads, showMajorRoads, status])
+    majorRoadFeaturesRef.current = dataLayer.addGeoJson(
+      createMajorRoadOverlays(majorRoads),
+    )
+    loadedMajorRoadsRef.current = majorRoads
+  }, [majorRoads, status])
+
+  useEffect(() => {
+    const dataLayer = dataLayerRef.current
+    if (!dataLayer || status !== 'ready') return
+
+    for (const feature of waterwayFeaturesRef.current) {
+      dataLayer.removeFeature(feature)
+    }
+    waterwayFeaturesRef.current = []
+
+    if (waterways && showWaterways) {
+      waterwayFeaturesRef.current = dataLayer.addGeoJson(waterways)
+    }
+  }, [showWaterways, status, waterways])
+
+  useEffect(() => {
+    const dataLayer = dataLayerRef.current
+    if (!dataLayer || status !== 'ready') return
+
+    if (!developmentAreas || !showDevelopmentAreas) return
+    if (loadedDevelopmentAreasRef.current === developmentAreas) return
+
+    developmentInfoWindowRef.current?.close()
+    developmentInfoPinnedRef.current = false
+    for (const feature of developmentAreaFeaturesRef.current) {
+      dataLayer.removeFeature(feature)
+    }
+    developmentAreaFeaturesRef.current = dataLayer.addGeoJson(developmentAreas)
+    loadedDevelopmentAreasRef.current = developmentAreas
+  }, [developmentAreas, showDevelopmentAreas, status])
 
   useEffect(() => {
     populationItemsRef.current = populationItems
+    populationByCodeRef.current = getDistributionValues(populationItems)
     // 교통 정보는 지도 타일 레이어이므로 인구 면 채우기를 잠시 숨겨 가리지 않게 합니다.
     showBoundaryFillRef.current = showBoundaryFill && !showRoadTraffic
     showWaterwaysRef.current = showWaterways
     showDevelopmentAreasRef.current = showDevelopmentAreas
     showMajorRoadsRef.current = showMajorRoads
+    selectedRegionCodeRef.current = selectedRegion?.code ?? ''
+    comparedRegionCodeRef.current = comparedRegionCode
     if (dataLayerRef.current) {
       applyPopulationStyles(
         dataLayerRef.current,
@@ -420,7 +539,10 @@ export default function NaverMap({
         showBoundaryFill && !showRoadTraffic,
         showWaterways,
         showDevelopmentAreas,
+        visibleDevelopmentAreaIds,
         showMajorRoads,
+        selectedRegion?.code ?? '',
+        comparedRegionCode,
       )
     }
   }, [
@@ -430,33 +552,43 @@ export default function NaverMap({
     showRoadTraffic,
     showWaterways,
     showDevelopmentAreas,
+    visibleDevelopmentAreaIds,
     showMajorRoads,
+    selectedRegion?.code,
+    comparedRegionCode,
   ])
 
   useEffect(() => {
     const maps = window.naver?.maps
     const map = mapRef.current
 
-    for (const marker of facilityMarkersRef.current) {
-      maps?.Event.clearInstanceListeners(marker)
-      marker.setMap(null)
-    }
-    facilityMarkersRef.current = []
-    facilityInfoWindowRef.current?.close()
-
-    if (!maps || !map || !facilityItems.length || status !== 'ready') {
+    if (!maps || !map || status !== 'ready') {
       return
     }
 
-    const infoWindow = new maps.InfoWindow({
-      content: '<div class="facility-info"></div>',
-      borderWidth: 0,
-      backgroundColor: 'transparent',
-      pixelOffset: new maps.Point(0, -14),
-    })
+    const visibleIds = new Set(facilityItems.map((facility) => facility.id))
+    for (const [id, marker] of facilityMarkersRef.current) {
+      if (visibleIds.has(id)) continue
+      maps.Event.clearInstanceListeners(marker)
+      marker.setMap(null)
+      facilityMarkersRef.current.delete(id)
+    }
+
+    if (!facilityItems.length) {
+      facilityInfoWindowRef.current?.close()
+      return
+    }
+
+    const infoWindow = facilityInfoWindowRef.current ?? new maps.InfoWindow({
+        content: '<div class="facility-info"></div>',
+        borderWidth: 0,
+        backgroundColor: 'transparent',
+        pixelOffset: new maps.Point(0, -14),
+      })
     facilityInfoWindowRef.current = infoWindow
 
-    facilityMarkersRef.current = facilityItems.map((facility) => {
+    for (const facility of facilityItems) {
+      if (facilityMarkersRef.current.has(facility.id)) continue
       const markerMeta = FACILITY_MARKER_META[facility.category]
       const marker = new maps.Marker({
         position: new maps.LatLng(facility.latitude, facility.longitude),
@@ -473,6 +605,13 @@ export default function NaverMap({
       })
 
       maps.Event.addListener(marker, 'click', () => {
+        if (onSelectFacilityRef.current) {
+          infoWindow.close()
+          developmentInfoWindowRef.current?.close()
+          developmentInfoPinnedRef.current = false
+          onSelectFacilityRef.current(facility)
+          return
+        }
         const address = facility.roadAddress || facility.parcelAddress || ''
         const collectedDate = facility.fetchedAt?.slice(0, 10)
         const provenance = facility.source === 'VWORLD'
@@ -491,21 +630,101 @@ export default function NaverMap({
         infoWindow.open(map, marker)
       })
 
-      return marker
-    })
-
-    return () => {
-      infoWindow.close()
-      for (const marker of facilityMarkersRef.current) {
-        maps.Event.clearInstanceListeners(marker)
-        marker.setMap(null)
-      }
-      facilityMarkersRef.current = []
+      facilityMarkersRef.current.set(facility.id, marker)
     }
   }, [facilityItems, status])
 
   useEffect(() => {
+    const maps = window.naver?.maps
+    const map = mapRef.current
+    if (!maps || !map || status !== 'ready') return
+
+    if (!addressSearchRequest) {
+      addressSearchMarkerRef.current?.setMap(null)
+      addressSearchMarkerRef.current = null
+      return
+    }
+
+    if (addressSearchRequest.kind === 'coordinate') {
+      addressSearchMarkerRef.current?.setMap(null)
+      addressSearchMarkerRef.current = null
+      map.morph(
+        new maps.LatLng(
+          addressSearchRequest.latitude,
+          addressSearchRequest.longitude,
+        ),
+        addressSearchRequest.zoom ?? 17,
+        { duration: 500 },
+      )
+      return
+    }
+
+    const service = maps.Service
+    if (!service) {
+      onAddressSearchResultRef.current?.({ status: 'error' })
+      return
+    }
+
+    let active = true
+    service.geocode(
+      { query: addressSearchRequest.query },
+      (searchStatus, response) => {
+        if (!active) return
+        if (searchStatus !== service.Status.OK) {
+          onAddressSearchResultRef.current?.({ status: 'error' })
+          return
+        }
+
+        const address = response?.v2.addresses[0]
+        if (!address) {
+          onAddressSearchResultRef.current?.({ status: 'empty' })
+          return
+        }
+
+        const roadAddress = address.roadAddress?.trim() ?? ''
+        const jibunAddress = address.jibunAddress?.trim() ?? ''
+        if (![roadAddress, jibunAddress].some((value) => value.includes('김해시'))) {
+          onAddressSearchResultRef.current?.({ status: 'outside' })
+          return
+        }
+
+        const latitude = Number(address.y)
+        const longitude = Number(address.x)
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+          onAddressSearchResultRef.current?.({ status: 'error' })
+          return
+        }
+
+        const coordinate = new maps.LatLng(latitude, longitude)
+        addressSearchMarkerRef.current?.setMap(null)
+        addressSearchMarkerRef.current = new maps.Marker({
+          map,
+          position: coordinate,
+          title: roadAddress || jibunAddress || addressSearchRequest.query,
+          icon: {
+            content: '<div class="address-search-marker" aria-hidden="true"><i></i></div>',
+            anchor: new maps.Point(18, 40),
+          },
+        })
+        map.morph(coordinate, 17, { duration: 500 })
+        onAddressSearchResultRef.current?.({
+          status: 'success',
+          title: roadAddress || jibunAddress || addressSearchRequest.query,
+          subtitle: roadAddress && jibunAddress ? jibunAddress : undefined,
+          roadAddress: roadAddress || undefined,
+          jibunAddress: jibunAddress || undefined,
+        })
+      },
+    )
+
+    return () => {
+      active = false
+    }
+  }, [addressSearchRequest, status])
+
+  useEffect(() => {
     let cancelled = false
+    const facilityMarkers = facilityMarkersRef.current
 
     async function initializeMap() {
       setStatus('loading')
@@ -546,10 +765,11 @@ export default function NaverMap({
           },
           scaleControl: true,
           logoControl: true,
-          mapDataControl: false,
+          mapDataControl: true,
         })
 
         const dataLayer = map.data
+        loadedBoundaryRef.current = boundary
         trafficLayerRef.current = new window.naver.maps.TrafficLayer()
 
         dataLayer.addGeoJson({
@@ -562,12 +782,6 @@ export default function NaverMap({
             },
           })),
         })
-        if (waterways) {
-          dataLayer.addGeoJson(waterways)
-        }
-        if (developmentAreas) {
-          dataLayer.addGeoJson(developmentAreas)
-        }
         dataLayer.addGeoJson(createBoundaryOutlines(boundary))
         applyPopulationStyles(
           dataLayer,
@@ -576,7 +790,10 @@ export default function NaverMap({
           showBoundaryFillRef.current,
           showWaterwaysRef.current,
           showDevelopmentAreasRef.current,
+          visibleDevelopmentAreaIdsRef.current,
           showMajorRoadsRef.current,
+          selectedRegionCodeRef.current,
+          comparedRegionCodeRef.current,
         )
 
         const hoverInfoWindow = new window.naver.maps.InfoWindow({
@@ -610,30 +827,29 @@ export default function NaverMap({
             const clickedAreaSourceId = String(
               event.feature.getProperty('areaSourceId') ?? '',
             )
-            const clickedFeature = developmentAreas?.features.find(
-              (feature) =>
-                String(feature.properties.areaSourceId ?? '') ===
-                clickedAreaSourceId,
+            const currentDevelopmentAreas = developmentAreasRef.current
+            const selectedFeatures = getClickedDevelopmentFeatures(
+              currentDevelopmentAreas,
+              clickedPoint,
+              clickedAreaSourceId,
+              visibleDevelopmentAreaIdsRef.current,
             )
-            const overlappingFeatures = clickedPoint && developmentAreas
-              ? developmentAreas.features
-                  .filter((feature) =>
-                    developmentFeatureContainsPoint(feature, clickedPoint),
-                  )
-                  .sort(
-                    (left, right) =>
-                      getDevelopmentFeatureArea(left) -
-                      getDevelopmentFeatureArea(right),
-                  )
-              : []
-            const selectedFeatures = overlappingFeatures.length
-              ? overlappingFeatures
-              : clickedFeature
-                ? [clickedFeature]
-                : []
+
+            if (
+              onSelectDevelopmentAreasRef.current &&
+              selectedFeatures.length > 0
+            ) {
+              hoverInfoWindow.close()
+              developmentInfoWindow.close()
+              developmentInfoPinnedRef.current = false
+              onSelectDevelopmentAreasRef.current(selectedFeatures.map(
+                (feature) => String(feature.properties.areaSourceId ?? ''),
+              ))
+              return
+            }
 
             const areaSections = selectedFeatures
-              .map((feature, index) => {
+              .map((feature) => {
                 const properties = feature.properties
                 const categoryLabel = String(
                   properties.categoryLabel ?? '개발 관련 구역',
@@ -644,7 +860,7 @@ export default function NaverMap({
                   developmentNoticesRef.current,
                 )
                 return (
-                  `<details class="development-area-choice"${index === 0 ? ' open' : ''}>` +
+                  '<details class="development-area-choice">' +
                     '<summary>' +
                       `<small>${escapeHtml(categoryLabel)}</small>` +
                       `<strong>${escapeHtml(areaName)}</strong>` +
@@ -659,18 +875,23 @@ export default function NaverMap({
             hoverInfoWindow.close()
             developmentInfoWindow.setContent(
               '<div class="development-info">' +
+                '<button type="button" class="development-info-close" data-close-development-info aria-label="고시정보 닫기">' +
+                  '<span aria-hidden="true">×</span>' +
+                '</button>' +
                 `<small>${selectedFeatures.length > 1 ? `겹친 개발구역 ${selectedFeatures.length}개 · 작은 구역부터` : 'VWorld 공식 지정구역'}</small>` +
-                `<h3>${escapeHtml(selectedFeatures.length > 1 ? '확인할 구역을 선택하세요' : String(selectedFeatures[0]?.properties.name ?? '개발 관련 구역'))}</h3>` +
+                `<h3>${escapeHtml(selectedFeatures.length > 1 ? '확인할 구역을 골라 주세요' : String(selectedFeatures[0]?.properties.name ?? '개발 관련 구역'))}</h3>` +
                 `<div class="development-area-choice-list">${areaSections}</div>` +
                 '<p class="development-source-note">구역 경계: VWorld · 관련 고시: 김해 UPIS</p>' +
               '</div>',
             )
+            developmentInfoPinnedRef.current = true
             developmentInfoWindow.open(map, event.coord)
             return
           }
           if (layer !== 'boundary') {
             return
           }
+          developmentInfoPinnedRef.current = false
           developmentInfoWindow.close()
           const properties: Record<string, unknown> = {
             adm_nm: event.feature.getProperty('adm_nm'),
@@ -717,14 +938,16 @@ export default function NaverMap({
               strokeOpacity: 1,
               strokeWeight: 4,
             })
-            hoverInfoWindow.setContent(
-              '<div class="region-hover-label development-hover-label">' +
-                `<small>${escapeHtml(categoryLabel)}</small>` +
-                `<strong>${escapeHtml(name)}</strong>` +
-                `<span>${escapeHtml(stageLabel)}</span>` +
-                '</div>',
-            )
-            hoverInfoWindow.open(map, event.coord)
+            if (shouldShowMapHoverPreview(developmentInfoPinnedRef.current)) {
+              hoverInfoWindow.setContent(
+                '<div class="region-hover-label development-hover-label">' +
+                  `<small>${escapeHtml(categoryLabel)}</small>` +
+                  `<strong>${escapeHtml(name)}</strong>` +
+                  `<span>${escapeHtml(stageLabel)}</span>` +
+                  '</div>',
+              )
+              hoverInfoWindow.open(map, event.coord)
+            }
             return
           }
           if (layer !== 'boundary') {
@@ -747,27 +970,28 @@ export default function NaverMap({
 
           const regionName = getRegionName(properties, boundaryType)
           const regionCode = getRegionCode(properties, boundaryType)
-          const value = getDistributionValues(populationItemsRef.current).get(
-            regionCode,
-          )
-          hoverInfoWindow.setContent(
-            '<div class="region-hover-label">' +
-              `<strong>${escapeHtml(regionName)}</strong>` +
-              (value === undefined
-                ? '<span>분포 데이터 없음</span>'
-                : `<span>주민등록 인구 ${value.toLocaleString()}명</span>`) +
-              '</div>',
-          )
-          hoverInfoWindow.open(map, event.coord)
+          const value = populationByCodeRef.current.get(regionCode)
+          if (shouldShowMapHoverPreview(developmentInfoPinnedRef.current)) {
+            hoverInfoWindow.setContent(
+              '<div class="region-hover-label">' +
+                `<strong>${escapeHtml(regionName)}</strong>` +
+                (value === undefined
+                  ? '<span>분포 데이터 없음</span>'
+                  : `<span>주민등록 인구 ${value.toLocaleString()}명</span>`) +
+                '</div>',
+            )
+            hoverInfoWindow.open(map, event.coord)
+          }
         })
 
-        dataLayer.addListener('mouseout', () => {
-          dataLayer.revertStyle()
+        dataLayer.addListener('mouseout', (event: NaverDataPointerEvent) => {
+          dataLayer.revertStyle(event.feature)
           hoverInfoWindow.close()
         })
 
         mapRef.current = map
         dataLayerRef.current = dataLayer
+        recordPerformanceMilestone('지도 사용 가능')
         setStatus('ready')
       } catch (error) {
         console.error(error)
@@ -786,29 +1010,64 @@ export default function NaverMap({
       mapRef.current?.destroy?.()
       mapRef.current = null
       dataLayerRef.current = null
+      loadedBoundaryRef.current = null
+      waterwayFeaturesRef.current = []
+      majorRoadFeaturesRef.current = []
       loadedMajorRoadsRef.current = null
+      developmentAreaFeaturesRef.current = []
+      loadedDevelopmentAreasRef.current = null
+      for (const marker of facilityMarkers.values()) {
+        window.naver?.maps?.Event.clearInstanceListeners(marker)
+        marker.setMap(null)
+      }
+      facilityMarkers.clear()
+      addressSearchMarkerRef.current?.setMap(null)
+      addressSearchMarkerRef.current = null
       facilityInfoWindowRef.current?.close()
       facilityInfoWindowRef.current = null
       developmentInfoWindowRef.current?.close()
       developmentInfoWindowRef.current = null
+      developmentInfoPinnedRef.current = false
     }
-  }, [boundaryType, developmentAreas, waterways])
+  }, [boundaryType])
+
+  const closeDevelopmentInfo = () => {
+    developmentInfoWindowRef.current?.close()
+    developmentInfoPinnedRef.current = false
+  }
 
   return (
-    <div className="map-wrapper">
+    <div
+      className="map-wrapper"
+      onPointerDownCapture={(event) => {
+        onMapInteraction?.()
+        const target = event.target
+        if (
+          target instanceof Element &&
+          target.closest('.development-info')
+        ) {
+          return
+        }
+        closeDevelopmentInfo()
+      }}
+      onClickCapture={(event) => {
+        const target = event.target
+        if (
+          target instanceof Element &&
+          target.closest('[data-close-development-info]')
+        ) {
+          closeDevelopmentInfo()
+        }
+      }}
+    >
       <div ref={mapElement} className="naver-map" />
 
       {status === 'ready' && showMajorRoads && majorRoads && (
         <div className="major-road-map-note" role="status">
-          <i aria-hidden="true" />
-          <span>주요 도로 · 차로 수 6 이상</span>
+          <strong>주요 도로</strong>
+          <span><i className="six-lane" aria-hidden="true" />6~7차로</span>
+          <span><i className="eight-lane" aria-hidden="true" />8차로 이상</span>
           <small>VWorld 도로중심선</small>
-        </div>
-      )}
-
-      {status === 'ready' && showRoadTraffic && (
-        <div className={`traffic-map-note ${showMajorRoads && majorRoads ? 'with-road-note' : ''}`} role="status">
-          도로 교통상황 표시 중 · 인구 색상 일시 숨김
         </div>
       )}
 
@@ -827,14 +1086,20 @@ export default function NaverMap({
       ) : null}
 
       {status !== 'ready' && (
-        <div className="map-message">
-          {status === 'loading' && '지도를 불러오는 중입니다.'}
+        <div className="map-message" aria-live="polite">
+          {status === 'loading' && (
+            <>
+              <span className="loading-spinner map-loading-spinner" aria-hidden="true" />
+              <strong>김해시 지도를 불러오는 중입니다</strong>
+              <span>지역 경계와 지도 정보를 함께 불러오고 있습니다.</span>
+            </>
+          )}
 
           {status === 'missing-key' && (
             <>
               <strong>네이버 지도 Client ID가 필요합니다.</strong>
               <span>
-                .env의 VITE_NAVER_MAP_CLIENT_ID 값을 확인해주세요.
+                .env의 VITE_NAVER_MAP_CLIENT_ID 값을 확인해 주세요.
               </span>
             </>
           )}
@@ -843,7 +1108,7 @@ export default function NaverMap({
             <>
               <strong>지도를 불러오지 못했습니다.</strong>
               <span>
-                Client ID와 localhost 허용 도메인을 확인해주세요.
+                Client ID와 localhost 허용 도메인을 확인해 주세요.
               </span>
             </>
           )}

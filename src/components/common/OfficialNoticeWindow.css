@@ -298,6 +298,58 @@
   font-weight: 700;
 }
 
+/* 지도 화면과 같은 제목·본문·보조 정보 위계를 사용한다. */
+.official-notice-window {
+  font-size: 14px;
+  line-height: 1.5;
+  letter-spacing: -0.012em;
+}
+
+.official-notice-eyebrow,
+.official-notice-tools label > span {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.official-notice-header h2 {
+  font-size: clamp(26px, 3vw, 34px);
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.official-notice-header p,
+.official-notice-tools input,
+.official-notice-tools select,
+.official-notice-item p {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.official-notice-summary small,
+.official-notice-item-heading,
+.official-notice-item-meta,
+.official-notice-footer {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.official-notice-summary strong {
+  font-size: 19px;
+  line-height: 1.3;
+}
+
+.official-notice-type,
+.official-notice-item .official-notice-status-note,
+.official-notice-status-note small {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.official-notice-title {
+  font-size: 17px;
+  line-height: 1.45;
+}
+
 @media (max-width: 640px) {
   .official-notice-backdrop { padding: 10px; }
   .official-notice-window {
@@ -314,4 +366,7 @@
   .official-notice-type-filter { width: auto; }
   .official-notice-footer { align-items: stretch; flex-direction: column; }
   .official-notice-footer button { width: 100%; }
+  .official-notice-tools input,
+  .official-notice-tools select { font-size: 16px; }
+  .official-notice-header h2 { font-size: 24px; }
 }
