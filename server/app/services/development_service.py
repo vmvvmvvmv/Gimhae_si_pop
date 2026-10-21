@@ -19,6 +19,8 @@ GYEONGNAM_NOTICE_PATH = "/citynet/jsp/sap/SAPGosiBizProcess.do"
 
 
 def verified_official_url(value: str) -> str:
+    # DB에 URL이 들어 있어도 화면에 내보내기 전에 HTTPS·공식 도메인·
+    # 상세 페이지 식별자를 다시 확인합니다. 목록/임의 외부 주소는 빈 값입니다.
     parsed = urlparse(value)
     if parsed.scheme != "https":
         return ""
@@ -56,6 +58,8 @@ def serialize_notice(row: DevelopmentNotice) -> dict[str, object]:
         else PENDING
     )
     status = (
+        # 저장된 상태가 '확인됨'이어도 URL 규칙을 통과하지 못하면
+        # 화면에 공식 원문으로 표시하지 않습니다.
         VERIFIED
         if official_url
         else PENDING if stored_status == VERIFIED else stored_status

@@ -164,11 +164,12 @@
 }
 
 .population-export-region-picker summary {
-  border: 1px solid #c5d6e6;
-  border-radius: 8px;
+  border: 0;
+  border-bottom: 1px solid #c5d6e6;
+  border-radius: 0;
   padding: 9px 12px;
   color: #263f57;
-  background: #fff;
+  background: transparent;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -176,10 +177,11 @@
 
 .population-export-region-menu {
   margin-top: 6px;
-  border: 1px solid #d9e4ee;
-  border-radius: 9px;
-  padding: 9px;
-  background: #fbfdff;
+  border: 0;
+  border-bottom: 1px solid #d9e4ee;
+  border-radius: 0;
+  padding: 9px 0;
+  background: transparent;
 }
 
 .population-export-region-menu input[type='search'] {

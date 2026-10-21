@@ -31,6 +31,8 @@ proj4.defs('EPSG:5186', EPSG_5186)
 
 // 원본 경계 좌표계(EPSG:5186)를 NAVER 지도에 표시할 위경도(EPSG:4326)로 바꿉니다.
 function transformCoordinates(value: unknown): unknown {
+  // GeoJSON은 [경도, 위도] 좌표가 여러 겹의 배열로 들어 있습니다.
+  // 가장 안쪽 숫자 쌍에서만 좌표계를 바꾸고 바깥 배열 모양은 유지합니다.
   if (!Array.isArray(value)) {
     return value
   }
@@ -57,6 +59,8 @@ export function normalizeBoundary(
 ): GeoJsonCollection {
   const crsName = collection.crs?.properties?.name ?? ''
 
+  // 이미 지도용 위경도라면 다시 변환하지 않습니다. 중복 변환은 경계를
+  // 엉뚱한 위치로 옮기므로 원본 파일의 좌표계 표기를 먼저 확인합니다.
   if (!crsName.includes('5186')) {
     return collection
   }

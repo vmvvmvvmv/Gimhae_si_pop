@@ -32,6 +32,8 @@ const areaNoticeCache = new WeakMap<
   WeakMap<GeoJsonFeature, DevelopmentNotice[]>
 >()
 
+// 위 WeakMap은 고시 목록과 도형 객체가 그대로인 동안 계산 결과를 재사용합니다.
+// 필터를 바꿀 때 수천 건의 고시 제목을 매번 정리하지 않으려는 캐시입니다.
 function getNoticeIndex(
   notices: DevelopmentNotice[],
 ): IndexedDevelopmentNotices {
@@ -63,6 +65,8 @@ function escapeRegExp(value: string): string {
 }
 
 function normalizeAreaName(value: string): string {
+  // '산업단지' 같은 공통 유형명을 빼고 고유한 지명 부분을 비교합니다.
+  // 이 결과는 화면에서 관련 고시 후보를 찾는 데만 쓰며 공식 원문 검증은 아닙니다.
   return value
     .replace(/김해/g, '')
     .replace(/(일반|국가|도시첨단)?산업단지/g, '')
@@ -83,6 +87,7 @@ function getNameMatches(
   const normalizedName = normalizeAreaName(areaName)
 
   if (areaCategory === 'INDUSTRIAL_COMPLEX' && normalizedName.length >= 2) {
+    // 짧은 지명만으로 다른 개발사업을 잘못 묶지 않도록 뒤의 유형명까지 확인합니다.
     const industrialNamePattern = new RegExp(
       `${escapeRegExp(normalizedName)}(?:일반|국가|도시첨단)?(?:산업단지|농공단지|물류단지)`,
     )
@@ -279,6 +284,8 @@ function asRing(value: unknown): Position[] | null {
 }
 
 function pointInRing(point: Position, ring: Position[]): boolean {
+  // 점에서 오른쪽으로 선을 그었을 때 경계와 만나는 횟수가 홀수면 내부입니다.
+  // 각 변을 지날 때마다 inside를 뒤집는 방식(광선 교차법)입니다.
   let inside = false
   for (let current = 0, previous = ring.length - 1; current < ring.length; previous = current++) {
     const [currentX, currentY] = ring[current]
@@ -299,6 +306,7 @@ function pointInPolygon(point: Position, value: unknown): boolean {
   const rings = value.map(asRing)
   const outerRing = rings[0]
   if (!outerRing || !pointInRing(point, outerRing)) return false
+  // 첫 고리는 바깥 경계, 나머지는 도형 안의 빈 공간(구멍)입니다.
   return !rings.slice(1).some((ring) => ring && pointInRing(point, ring))
 }
 
@@ -315,6 +323,8 @@ export function developmentFeatureContainsPoint(
 }
 
 function ringArea(ring: Position[]): number {
+  // 좌표쌍의 신발끈 공식으로 넓이를 비교합니다. 여기서는 클릭 후보의
+  // 작은 구역을 먼저 고르기 위한 상대 크기이며 공식 면적값이 아닙니다.
   let area = 0
   for (let current = 0, previous = ring.length - 1; current < ring.length; previous = current++) {
     area +=
@@ -367,6 +377,8 @@ export function getClickedDevelopmentFeatures(
   }
   if (!point) return [clicked]
 
+  // 보이는 구역만 다시 검사합니다. 숨긴 구역이 선택 목록에 나타나면
+  // 사용자가 보는 지도와 클릭 결과가 서로 달라집니다.
   const overlapping = areas.features.filter((feature) => {
     const sourceId = String(feature.properties.areaSourceId ?? '')
     return (
