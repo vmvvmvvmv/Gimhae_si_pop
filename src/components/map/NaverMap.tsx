@@ -20,6 +20,7 @@ import {
   getBoundaryVisualStyle,
   shouldShowMapHoverPreview,
 } from '../../features/map/mapPresentation'
+import { getRegionTourBounds, type RegionTourBounds } from '../../features/onboarding/regionTourBounds'
 import { recordPerformanceMilestone } from '../../lib/performanceMetrics'
 
 interface SelectedRegion {
@@ -117,6 +118,8 @@ function getDistributionValues(
 }
 
 function escapeHtml(value: string): string {
+  // NAVER 정보창에는 문자열로 만든 HTML을 넣습니다. 외부 데이터가 태그로
+  // 해석되지 않도록 제목·주소 등을 끼워 넣기 전에 특수문자를 바꿉니다.
   return value.replace(
     /[&<>"']/g,
     (character) =>
@@ -412,6 +415,8 @@ export default function NaverMap({
   // DashboardPage가 선택·표시 조건을 전달하고, 지도 클릭은 콜백으로 되돌려줍니다.
   // NAVER 지도 객체는 React 화면 상태와 달라 ref에 보관합니다.
   const mapElement = useRef<HTMLDivElement>(null)
+  const [tourRegion, setTourRegion] = useState<RegionTourBounds | null>(null)
+  const tourRegionPathRef = useRef<SVGPathElement>(null)
   const mapRef = useRef<NaverMapInstance | null>(null)
   const dataLayerRef = useRef<NaverMapData | null>(null)
   const loadedBoundaryRef = useRef<GeoJsonCollection | null>(null)
@@ -443,9 +448,30 @@ export default function NaverMap({
   const developmentNoticesRef = useRef(developmentNotices)
   const [status, setStatus] = useState('loading')
 
+  // NAVER 지도 이벤트는 React가 처음 등록한 콜백을 계속 기억합니다.
+  // ref를 최신 props로 갱신하면 오래된 선택 상태를 참조하지 않습니다.
   useEffect(() => {
     onSelectRegionRef.current = onSelectRegion
   }, [onSelectRegion])
+
+  useEffect(() => {
+    const path = tourRegionPathRef.current
+    if (!path || !tourRegion) return
+    const selectTourRegion = (event: MouseEvent) => {
+      if (document.body.dataset.mapTourActive !== 'true') return
+      const feature = loadedBoundaryRef.current?.features[tourRegion.featureIndex]
+      if (!feature) return
+      event.stopPropagation()
+      // 네이버 지도 마커가 위에 있어도 튜토리얼에서는 해당 동을 선택합니다.
+      onSelectRegionRef.current({
+        name: getRegionName(feature.properties, boundaryType),
+        code: getRegionCode(feature.properties, boundaryType),
+        type: boundaryType,
+      })
+    }
+    path.addEventListener('click', selectTourRegion)
+    return () => path.removeEventListener('click', selectTourRegion)
+  }, [tourRegion, boundaryType])
 
   useEffect(() => {
     onSelectFacilityRef.current = onSelectFacility
@@ -724,10 +750,12 @@ export default function NaverMap({
 
   useEffect(() => {
     let cancelled = false
+    let tourResizeObserver: ResizeObserver | null = null
     const facilityMarkers = facilityMarkersRef.current
 
     async function initializeMap() {
       setStatus('loading')
+      setTourRegion(null)
       const clientId = import.meta.env.VITE_NAVER_MAP_CLIENT_ID?.trim()
 
       if (!clientId) {
@@ -772,6 +800,26 @@ export default function NaverMap({
         loadedBoundaryRef.current = boundary
         trafficLayerRef.current = new window.naver.maps.TrafficLayer()
 
+        const updateTourRegion = () => {
+          if (!mapElement.current) return
+          const projection = map.getProjection()
+          const target = getRegionTourBounds(
+            boundary.features,
+            (longitude, latitude) => projection.fromCoordToOffset(
+              new window.naver!.maps!.LatLng(latitude, longitude),
+            ),
+            { width: mapElement.current.clientWidth, height: mapElement.current.clientHeight },
+          )
+          setTourRegion(target)
+        }
+        // 지도가 움직이거나 크기가 바뀌면 화면에 보이는 GeoJSON 지역을 다시 찾습니다.
+        window.naver.maps.Event.addListener(map, 'idle', updateTourRegion)
+        if (typeof ResizeObserver !== 'undefined') {
+          tourResizeObserver = new ResizeObserver(updateTourRegion)
+          tourResizeObserver.observe(mapElement.current)
+        }
+        updateTourRegion()
+
         dataLayer.addGeoJson({
           ...boundary,
           features: boundary.features.map((feature) => ({
@@ -813,6 +861,7 @@ export default function NaverMap({
         developmentInfoWindowRef.current = developmentInfoWindow
 
         dataLayer.addListener('click', (event: NaverDataPointerEvent) => {
+          // 경계·도로·개발구역이 한 Data 레이어에 있으므로 종류를 먼저 구분합니다.
           const layer = event.feature.getProperty('__layer')
           if (layer === 'waterway') {
             return
@@ -828,6 +877,8 @@ export default function NaverMap({
               event.feature.getProperty('areaSourceId') ?? '',
             )
             const currentDevelopmentAreas = developmentAreasRef.current
+            // 지도 엔진은 겹친 도형 중 하나만 알려 줍니다. 클릭 좌표로
+            // 실제로 겹친 구역을 다시 찾아 왼쪽 설명창에 함께 전달합니다.
             const selectedFeatures = getClickedDevelopmentFeatures(
               currentDevelopmentAreas,
               clickedPoint,
@@ -901,6 +952,8 @@ export default function NaverMap({
             EMD_CD: event.feature.getProperty('EMD_CD'),
           }
 
+          // 지도는 선택한 지역의 이름·코드·유형을 부모에게 알립니다.
+          // 지역별 조회와 패널 변경은 DashboardPage에서 처리합니다.
           onSelectRegionRef.current({
             name: getRegionName(properties, boundaryType),
             code: getRegionCode(properties, boundaryType),
@@ -1005,6 +1058,8 @@ export default function NaverMap({
 
     return () => {
       cancelled = true
+      tourResizeObserver?.disconnect()
+      if (mapRef.current) window.naver?.maps?.Event.clearInstanceListeners(mapRef.current)
       trafficLayerRef.current?.setMap(null)
       trafficLayerRef.current = null
       mapRef.current?.destroy?.()
@@ -1061,6 +1116,29 @@ export default function NaverMap({
       }}
     >
       <div ref={mapElement} className="naver-map" />
+      <svg
+        className="map-tour-region"
+        aria-hidden="true"
+        data-tour-path={tourRegion?.path}
+        viewBox={tourRegion ? `0 0 ${tourRegion.bounds.width} ${tourRegion.bounds.height}` : undefined}
+        preserveAspectRatio="none"
+        style={tourRegion
+          ? {
+              left: tourRegion.bounds.left,
+              top: tourRegion.bounds.top,
+              width: tourRegion.bounds.width,
+              height: tourRegion.bounds.height,
+            }
+          : { display: 'none' }}
+      >
+        {tourRegion && (
+          <path
+            ref={tourRegionPathRef}
+            d={tourRegion.path}
+            fillRule="evenodd"
+          />
+        )}
+      </svg>
 
       {status === 'ready' && showMajorRoads && majorRoads && (
         <div className="major-road-map-note" role="status">

@@ -9,6 +9,7 @@
 - `public/data/`: 브라우저에서 사용하는 GeoJSON 경계 데이터
 - `docs/architecture.md`: 데이터 흐름과 책임 분리 문서
 - `docs/project-handoff.md`: 다른 채팅이나 개발 환경에서 작업을 이어가기 위한 현재 상태·실행법·남은 과제
+- `docs/other-pc-setup.md`: 다른 Windows PC에서 GitHub 코드·로컬 DB·API 키를 구분해 이어가는 순서
 - `docs/beginner-code-guide.md`: 처음 보는 사람을 위한 코드 읽는 순서와 폴더·함수 역할
 - `docs/deployment-preflight.md`: Docker·DB·지도 키·공개 전 점검 순서
 

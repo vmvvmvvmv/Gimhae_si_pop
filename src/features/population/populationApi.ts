@@ -195,6 +195,8 @@ export async function fetchPopulation(
   year: number,
   month: number,
 ): Promise<AdminPopulationResponse> {
+  // FastAPI의 level/year/month 이름과 같게 URL 쿼리를 만듭니다.
+  // 요청이 들어간 뒤에는 api/population.py → service → repository 순서로 갑니다.
   const params = new URLSearchParams({
     level,
     year: String(year),
@@ -224,6 +226,7 @@ export async function fetchPopulation(
     throw new Error(message)
   }
 
+  // 'as'는 TypeScript에게 응답 모양을 알려줄 뿐, 실행 중 검증을 하지는 않습니다.
   return (await response.json()) as AdminPopulationResponse
 }
 
@@ -322,6 +325,7 @@ export async function fetchSimilarDensity(
   year: number,
   month: number,
 ): Promise<SimilarDensityResponse> {
+  // area_tolerance=0.1은 선택 지역 면적의 ±10% 범위를 뜻합니다.
   const params = new URLSearchParams({
     region_code: regionCode,
     year: String(year),

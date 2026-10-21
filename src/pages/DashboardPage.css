@@ -1675,6 +1675,25 @@
   background: #e7f0f0;
 }
 
+.map-tour-region {
+  position: absolute;
+  pointer-events: none;
+}
+
+.map-tour-region path {
+  fill: transparent;
+  pointer-events: none;
+}
+
+body[data-map-tour-active="true"] .map-tour-region {
+  z-index: 100;
+}
+
+body[data-map-tour-active="true"] .map-tour-region path {
+  pointer-events: fill;
+  cursor: pointer;
+}
+
 .traffic-map-note {
   position: absolute;
   z-index: 21;
@@ -6014,6 +6033,652 @@
   .dashboard-page .filter-card,
   .dashboard-page .detail-card,
   .side-panel-toggle {
+    transition: none;
+  }
+}
+
+/* 첫 방문 안내는 언제든 다시 열 수 있습니다. 데스크톱은 왼쪽 메뉴, 모바일은 조회 조건에 둡니다. */
+.dashboard-guide-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  border: 1px solid #cbddeb;
+  border-radius: 10px;
+  padding: 7px 10px;
+  color: #2d67b1;
+  background: #f4f8fe;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.dashboard-guide-trigger span {
+  display: grid;
+  width: 19px;
+  height: 19px;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: #2d67b1;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.dashboard-guide-trigger:hover,
+.dashboard-guide-trigger:focus-visible {
+  color: #174d89;
+  background: #e7f1ff;
+  outline: 2px solid #8fc4f5;
+  outline-offset: 2px;
+}
+
+.dashboard-guide-rail {
+  display: none;
+}
+
+.dashboard-guide-mobile {
+  align-self: flex-end;
+  margin-left: auto;
+}
+
+@media (min-width: 821px) {
+  .dashboard-guide-rail {
+    display: flex;
+    min-height: 58px;
+    width: calc(100% - 10px);
+    flex-direction: column;
+    gap: 2px;
+    margin-top: auto;
+    padding: 6px 2px;
+    font-size: 11px;
+  }
+
+  .dashboard-page .dashboard-rail-caption {
+    margin-top: 12px;
+  }
+
+  .dashboard-guide-mobile {
+    display: none;
+  }
+}
+
+/* 평면형 UI: 큰 영역은 면으로 구분하고, 내부 정보는 간격과 구분선으로 정리한다. */
+.dashboard-page .filter-card,
+.dashboard-page .map-card,
+.dashboard-page .detail-card {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.dashboard-page .map-card > .card-heading {
+  box-shadow: none;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.dashboard-page .filter-card .search-input-wrap input,
+.dashboard-page .filter-card .filter-field select {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #aebfce;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.dashboard-page .filter-card .search-input-wrap input:focus,
+.dashboard-page .filter-card .filter-field select:focus {
+  border-bottom-color: var(--ui-accent);
+  outline: 2px solid rgb(45 103 177 / 17%);
+  outline-offset: 2px;
+}
+
+.dashboard-page .address-search-submit {
+  color: var(--ui-accent);
+  background: transparent;
+  box-shadow: none;
+}
+
+.dashboard-page .filter-card .population-export-open {
+  min-height: 36px;
+  padding: 4px 0;
+  color: var(--ui-accent);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.dashboard-page .filter-card .population-export-open:hover {
+  background: transparent;
+  border-bottom-color: var(--ui-accent);
+}
+
+.dashboard-page .map-heading-tools {
+  width: auto;
+  gap: 2px 5px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.dashboard-page .map-card .boundary-fill-toggle,
+.dashboard-page .map-card .waterway-layer-toggle,
+.dashboard-page .map-card .road-traffic-layer-toggle,
+.dashboard-page .map-card .development-layer-toggle,
+.dashboard-page .map-card .facility-menu-toggle {
+  padding: 7px 6px 5px;
+  color: #566576;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 8px;
+  box-shadow: none;
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.dashboard-page .map-card .boundary-fill-toggle:hover,
+.dashboard-page .map-card .waterway-layer-toggle:hover,
+.dashboard-page .map-card .road-traffic-layer-toggle:hover,
+.dashboard-page .map-card .development-layer-toggle:hover,
+.dashboard-page .map-card .facility-menu-toggle:hover {
+  color: var(--ui-accent);
+  background: #edf4fc;
+  border-color: #a9c3e3;
+  box-shadow: none;
+}
+
+.dashboard-page .map-heading-tools .boundary-fill-toggle.active,
+.dashboard-page .map-heading-tools .waterway-layer-toggle.active,
+.dashboard-page .map-heading-tools .road-traffic-layer-toggle.active,
+.dashboard-page .map-heading-tools .development-layer-toggle.active,
+.dashboard-page .map-heading-tools .facility-menu-toggle.active,
+.dashboard-page .map-heading-tools .facility-menu-toggle.open,
+.dashboard-page .map-heading-tools .boundary-fill-toggle.active:hover,
+.dashboard-page .map-heading-tools .waterway-layer-toggle.active:hover,
+.dashboard-page .map-heading-tools .road-traffic-layer-toggle.active:hover,
+.dashboard-page .map-heading-tools .development-layer-toggle.active:hover,
+.dashboard-page .map-heading-tools .facility-menu-toggle.active:hover,
+.dashboard-page .map-heading-tools .facility-menu-toggle.open:hover {
+  color: #fff;
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
+  box-shadow: none;
+}
+
+.dashboard-page .map-heading-tools .boundary-fill-toggle.active:hover,
+.dashboard-page .map-heading-tools .waterway-layer-toggle.active:hover,
+.dashboard-page .map-heading-tools .road-traffic-layer-toggle.active:hover,
+.dashboard-page .map-heading-tools .development-layer-toggle.active:hover,
+.dashboard-page .map-heading-tools .facility-menu-toggle.active:hover,
+.dashboard-page .map-heading-tools .facility-menu-toggle.open:hover {
+  background: #1f5599;
+  border-color: #1f5599;
+}
+
+.dashboard-page .map-heading-tools .development-layer-toggle.open:not(.active) {
+  color: var(--ui-accent);
+  background: #edf4fc;
+  border-color: #a9c3e3;
+}
+
+.dashboard-page .map-heading-tools button:focus-visible {
+  outline: 2px solid #77a9df;
+  outline-offset: 2px;
+}
+
+.dashboard-page .map-heading-tools button:active {
+  transform: translateY(1px);
+}
+
+/* 빠른 토글과 설정 메뉴는 동작 방식이 다르므로 서로 다른 상태 표현을 쓴다. */
+.dashboard-page .map-quick-controls,
+.dashboard-page .map-menu-controls {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.dashboard-page .map-menu-controls {
+  margin-left: 4px;
+  padding-left: 10px;
+  border-left: 1px solid var(--ui-border);
+}
+
+.dashboard-page .map-card .map-quick-controls .boundary-fill-toggle,
+.dashboard-page .map-card .map-quick-controls .waterway-layer-toggle {
+  min-height: 38px;
+  gap: 6px;
+  padding: 7px 9px;
+  color: #637589;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+
+.dashboard-page .map-heading-tools .map-quick-controls .boundary-fill-toggle.active,
+.dashboard-page .map-heading-tools .map-quick-controls .waterway-layer-toggle.active {
+  color: #245b9b;
+  background: #eaf3ff;
+  border-color: #d2e2f4;
+}
+
+.dashboard-page .map-heading-tools .map-quick-controls .boundary-fill-toggle:hover,
+.dashboard-page .map-heading-tools .map-quick-controls .waterway-layer-toggle:hover {
+  color: #174f90;
+  background: #e2efff;
+  border-color: #bfd8f0;
+}
+
+.dashboard-page .map-heading-tools .map-quick-controls .boundary-fill-toggle.active:hover,
+.dashboard-page .map-heading-tools .map-quick-controls .waterway-layer-toggle.active:hover {
+  color: #174f90;
+  background: #dcecff;
+  border-color: #afcdea;
+}
+
+.dashboard-page .map-quick-controls .map-quick-indicator {
+  width: 7px;
+  height: 7px;
+  min-width: 7px;
+  flex: 0 0 auto;
+  margin-left: 2px;
+  padding: 0;
+  background: #a9b8c5;
+  border: 0;
+  border-radius: 50%;
+}
+
+.dashboard-page .map-quick-controls .active .map-quick-indicator {
+  background: var(--ui-accent);
+  box-shadow: 0 0 0 3px rgb(45 103 177 / 13%);
+}
+
+.dashboard-page .map-heading-tools .map-quick-controls .boundary-fill-toggle.active i {
+  border-color: var(--ui-accent);
+  background: rgb(45 103 177 / 18%);
+}
+
+.dashboard-page .map-heading-tools .map-quick-controls .waterway-layer-toggle.active i {
+  border-bottom-color: var(--ui-accent);
+}
+
+.dashboard-page .map-card .map-menu-controls .development-layer-toggle,
+.dashboard-page .map-card .map-menu-controls .facility-menu-toggle {
+  min-height: 38px;
+  gap: 6px;
+  padding: 7px 6px 5px;
+  color: #566b80;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+}
+
+.dashboard-page .map-heading-tools .map-menu-controls .development-layer-toggle.active,
+.dashboard-page .map-heading-tools .map-menu-controls .facility-menu-toggle.active {
+  color: #245b9b;
+  background: transparent;
+  border-bottom-color: transparent;
+}
+
+.dashboard-page .map-heading-tools .map-menu-controls .development-layer-toggle:hover,
+.dashboard-page .map-heading-tools .map-menu-controls .facility-menu-toggle:hover {
+  color: #174f90;
+  background: #f1f6fc;
+  border-bottom-color: #bfd8f0;
+}
+
+.dashboard-page .map-heading-tools .map-menu-controls .development-layer-toggle.open,
+.dashboard-page .map-heading-tools .map-menu-controls .facility-menu-toggle.open,
+.dashboard-page .map-heading-tools .map-menu-controls .development-layer-toggle.open:hover,
+.dashboard-page .map-heading-tools .map-menu-controls .facility-menu-toggle.open:hover {
+  color: #174f90;
+  background: #f1f6fc;
+  border-bottom-color: var(--ui-accent);
+}
+
+.dashboard-page .map-heading-tools .map-menu-controls .development-layer-toggle.active i {
+  border-color: #26734a;
+  background: rgb(38 115 74 / 18%);
+}
+
+.dashboard-page .map-menu-controls .development-layer-control .development-layer-toggle .map-menu-state,
+.dashboard-page .map-menu-controls .facility-layer-control .facility-menu-toggle .map-menu-count {
+  min-width: 0;
+  padding: 2px 5px;
+  color: #245b9b;
+  background: #eaf3ff;
+  border: 0;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.dashboard-page .map-menu-controls .facility-layer-control .facility-menu-toggle .map-menu-count {
+  min-width: 24px;
+  text-align: center;
+}
+
+.dashboard-page .map-menu-controls .development-layer-control .development-layer-toggle .map-menu-chevron,
+.dashboard-page .map-menu-controls .facility-layer-control .facility-menu-toggle .map-menu-chevron {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  min-width: 0;
+  flex: 0 0 auto;
+  margin: -4px 1px 0 2px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-right: 1.5px solid currentcolor;
+  border-bottom: 1.5px solid currentcolor;
+  border-radius: 0;
+  transform: rotate(45deg);
+  transition: transform 150ms ease;
+}
+
+.dashboard-page .map-menu-controls .open .map-menu-chevron {
+  margin-top: 3px;
+  transform: rotate(225deg);
+}
+
+@media (max-width: 820px) {
+  .dashboard-page .map-heading-tools {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .dashboard-page .map-menu-controls {
+    width: 100%;
+    margin: 4px 0 0;
+    padding: 6px 0 0;
+    border: 0;
+    border-top: 1px solid var(--ui-border);
+  }
+}
+
+@media (max-width: 420px) {
+  .dashboard-page .map-card .facility-popover:not(.development-filter-popover) {
+    position: fixed;
+    z-index: 120;
+    inset: auto 14px 14px;
+    width: auto;
+    max-height: calc(100dvh - 28px);
+    overflow-y: auto;
+  }
+}
+
+.dashboard-page .map-legend {
+  margin-left: 3px;
+  padding-left: 9px;
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--ui-border);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.dashboard-page .detail-region-meta > span,
+.dashboard-page .detail-tabs,
+.dashboard-page .summary-tab-panel .reorganization-analysis,
+.dashboard-page .age-chart-breakdown,
+.dashboard-page .trend-svg-wrap {
+  background: transparent;
+  box-shadow: none;
+}
+
+.dashboard-page .age-chart-breakdown {
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  padding: 7px 2px 10px;
+}
+
+.dashboard-page .stat-grid,
+.dashboard-page .comparison-grid,
+.dashboard-page .trend-summary,
+.dashboard-page .living-population-summary {
+  gap: 0;
+  border-top: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.dashboard-page .stat-grid > div,
+.dashboard-page .comparison-grid > div,
+.dashboard-page .trend-summary > div,
+.dashboard-page .living-population-summary > div {
+  padding: 11px 8px;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--ui-border);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.dashboard-page .stat-grid > div:last-child,
+.dashboard-page .comparison-grid > div:last-child,
+.dashboard-page .trend-summary > div:last-child,
+.dashboard-page .living-population-summary > div:last-child {
+  border-right: 0;
+}
+
+.dashboard-page .trend-svg-wrap {
+  border: 0;
+  border-radius: 0;
+}
+
+.dashboard-page .side-layer-section {
+  gap: 14px;
+  padding: 16px 2px;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+  border-radius: 0;
+}
+
+.dashboard-page .side-layer-scroll > .side-layer-section:first-child {
+  border-top: 0;
+}
+
+.dashboard-page .side-facility-toggles {
+  gap: 0 14px;
+}
+
+.dashboard-page .facility-toggle,
+.dashboard-page .side-facility-toggles .facility-toggle,
+.dashboard-page .development-compact-toggle,
+.dashboard-page .development-compact-ended {
+  padding: 9px 2px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.dashboard-page .facility-toggle.active,
+.dashboard-page .development-compact-toggle.active,
+.dashboard-page .development-compact-ended.active {
+  color: var(--ui-accent);
+  background: #edf4fc;
+  border-color: var(--ui-accent);
+}
+
+.dashboard-page .facility-popover .facility-toggle,
+.dashboard-page .side-facility-toggles .facility-toggle {
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+}
+
+.dashboard-page .facility-popover .facility-toggle:focus-visible,
+.dashboard-page .side-facility-toggles .facility-toggle:focus-visible {
+  outline: 2px solid #77a9df;
+  outline-offset: -2px;
+}
+
+.dashboard-page .facility-popover-heading,
+.dashboard-page .development-filter-heading {
+  background: transparent;
+}
+
+.dashboard-page .facility-popover .facility-toggles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
+  margin-top: 5px;
+}
+
+.dashboard-page .facility-popover .facility-toggle {
+  min-width: 0;
+  justify-content: flex-start;
+  padding: 10px 2px;
+  color: #647386;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.dashboard-page .facility-popover .facility-toggle:hover {
+  color: var(--ui-accent);
+  background: #f1f6fc;
+}
+
+.dashboard-page .facility-popover .facility-toggle.active {
+  color: var(--ui-accent);
+  background: #eaf3ff;
+  border-bottom-color: var(--ui-accent);
+}
+
+.dashboard-page .facility-popover .facility-toggle.active:hover {
+  background: #dcecff;
+}
+
+.dashboard-page .facility-popover .facility-toggle small,
+.dashboard-page .facility-popover .facility-toggle-state,
+.dashboard-page .side-layer-panel .facility-toggle small,
+.dashboard-page .side-layer-panel .facility-toggle-state {
+  min-width: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  font-size: 11px;
+}
+
+.dashboard-page .facility-popover .facility-toggle-state {
+  margin-left: auto;
+}
+
+.dashboard-page .facility-popover .development-compact-panel {
+  gap: 0 14px;
+}
+
+.dashboard-page .facility-popover .development-compact-toggle,
+.dashboard-page .facility-popover .development-compact-ended {
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.dashboard-page .facility-popover .development-compact-toggle.active,
+.dashboard-page .facility-popover .development-compact-ended.active {
+  color: var(--ui-accent);
+  background: #eaf3ff;
+  border-bottom-color: var(--ui-accent);
+}
+
+.dashboard-page .facility-popover .development-compact-toggle.active:hover,
+.dashboard-page .facility-popover .development-compact-ended.active:hover {
+  background: #dcecff;
+}
+
+.dashboard-page .facility-popover .facility-toggle-state {
+  font-weight: 800;
+}
+
+@media (max-width: 620px) {
+  .dashboard-page .facility-popover .facility-toggles {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dashboard-page .development-compact-year,
+.dashboard-page .development-compact-year select {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #b8c8d6;
+  border-radius: 0;
+}
+
+.dashboard-page .side-layer-result button,
+.dashboard-page .development-filter-reset,
+.dashboard-page .facility-roadview-actions > button,
+.dashboard-page .facility-roadview-actions > a,
+.dashboard-page .dashboard-guide-trigger {
+  color: var(--ui-accent);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.dashboard-page .dashboard-guide-trigger span {
+  color: var(--ui-accent);
+  background: transparent;
+}
+
+.dashboard-page .description-empty-notice,
+.dashboard-page .comparison-data-warning,
+.dashboard-page .layer-loading-state {
+  padding: 10px 2px 10px 11px;
+  background: transparent;
+  border: 0;
+  border-left: 3px solid #b9c8d6;
+  border-radius: 0;
+}
+
+.dashboard-page .comparison-data-warning {
+  border-left-color: #d3a35b;
+}
+
+.dashboard-page .two-region-comparison,
+.dashboard-page .two-region-first,
+.dashboard-page .two-region-pickers label {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+@media (max-width: 820px) {
+  .dashboard-page .filter-card,
+  .dashboard-page .map-card,
+  .dashboard-page .detail-card {
+    border: 0;
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .dashboard-page .stat-grid,
+  .dashboard-page .comparison-grid,
+  .dashboard-page .trend-summary {
+    row-gap: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-page .map-heading-tools button,
+  .dashboard-page .facility-popover .facility-toggle,
+  .dashboard-page .side-facility-toggles .facility-toggle {
     transition: none;
   }
 }
