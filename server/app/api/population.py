@@ -150,7 +150,8 @@ async def region_population(
     month: int = Query(12, ge=1, le=12),
     db: Session = Depends(get_db),
 ) -> JSONResponse:
-    # API 계층은 URL 입력을 받고 응답을 돌려줍니다. 조회 규칙은 서비스 계층에 둡니다.
+    # Query가 형식·범위(예: month 1~12)를 검사합니다. 실제 DB 조회와
+    # '저장되지 않은 월' 응답은 population_query_service가 결정합니다.
     return JSONResponse(
         content=read_stored_population(db, level, year, month),
         media_type="application/json; charset=utf-8",
@@ -179,11 +180,14 @@ async def population_comparison(
     target_ym: str = Query(..., min_length=6, max_length=6, pattern=r"^\d{6}$"),
     db: Session = Depends(get_db),
 ) -> JSONResponse:
+    # Query는 YYYYMM의 모양만 검사합니다. 202613처럼 실제로 없는 월과
+    # 같은 달끼리의 비교는 서비스가 검사하고 여기서 400으로 바꿉니다.
     try:
         result = read_comparison(db, level, region_code, base_ym, target_ym)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     except RegionNotFound as error:
+        # 서비스의 지역 없음 예외를 브라우저가 이해할 HTTP 404로 변환합니다.
         raise HTTPException(status_code=404, detail="지역을 찾을 수 없습니다.") from error
 
     return JSONResponse(

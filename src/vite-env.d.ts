@@ -27,6 +27,9 @@ declare global {
 
   interface NaverMapInstance {
     data: NaverMapData
+    getProjection(): {
+      fromCoordToOffset(coordinate: unknown): { x: number; y: number }
+    }
     morph(
       coordinate: unknown,
       zoom?: number,

@@ -54,7 +54,7 @@
 
 ## 4. 예시: 지도에서 동을 누를 때
 
-`NaverMap.tsx`가 지도 클릭을 감지해 지역 코드와 이름을 `onSelectRegion`으로 부모 화면에 전달한다. `DashboardPage.tsx`의 `selectRegion`이 선택 지역을 기억한다. 그 뒤 선택 지역용 비교·추이 조회가 활성화되고 오른쪽 상세 패널을 다시 그린다. 지도 경계 파일의 코드와 DB 지역 코드가 맞아야 숫자가 표시된다.
+`NaverMap.tsx`가 지도 클릭을 감지해 지역 코드·이름·유형을 `onSelectRegion`으로 부모 화면에 전달한다. `DashboardPage.tsx`의 `selectRegion`이 선택 지역을 기억한다. 그 뒤 선택 지역용 비교·추이 조회가 활성화되고 왼쪽 설명창을 다시 그린다. 지도 경계 파일의 코드와 DB 지역 코드가 맞아야 숫자가 표시된다.
 
 `두 동 비교` 코드는 보존되어 있지만 지금은 `DashboardPage.tsx`의 `ENABLE_TWO_REGION_COMPARISON = false`로 화면에서 꺼져 있다. 일반 `지역 비교` 탭의 순위 목록은 계속 사용 가능하다.
 

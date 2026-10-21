@@ -1,6 +1,6 @@
 # 김해시 GIS 인구지도 프로젝트 인수인계
 
-최종 정리일: 2026-10-12
+최종 정리일: 2026-10-21 (폴더 역할·캐시·인앱 튜토리얼·다른 PC 이어가기 갱신; 아래 데이터 건수와 과거 검증 결과는 별도 표시된 시점의 기록)
 프로젝트 경로: `C:\Users\User\Documents\ChatGPT\Gimhae_si_Map`
 원격 저장소: `https://github.com/vmvvmvvmv/Gimhae_si_pop.git`
 
@@ -34,6 +34,15 @@
 | 데이터베이스 | SQLite |
 | 공간 처리 | Shapely, pyproj |
 
+### Redis를 쓰는가?
+
+**현재 저장소 기준 Redis는 사용하지 않는다.** 프론트엔드·백엔드 의존성, 서버 연결 코드, Docker Compose 서비스에 Redis가 없다. 과거 사용 여부까지 단정하는 말은 아니며, 새 기능을 구현할 때도 Redis가 이미 설치되어 있다고 가정하면 안 된다.
+
+- **계속 보관할 데이터:** `server/data/gimhae_population.db`의 SQLite에 저장한다. 서버를 다시 켜도 DB 파일이 남아 있으면 데이터가 유지된다.
+- **화면에서 잠깐 재사용할 조회 결과:** `src/app/providers.tsx`의 TanStack Query가 **브라우저 메모리**에 캐시한다(`staleTime: 60_000`). 새로고침하거나 브라우저를 닫으면 다시 조회할 수 있다. 여러 사용자·서버가 공유하는 Redis 캐시가 아니다.
+- **계산 결과 임시 보관:** 일부 지도·개발구역 코드의 `Map`/`WeakMap`도 실행 중 메모리 캐시다. 영구 저장소가 아니다.
+- **정적 파일 캐시:** 배포 시 `server/app/main.py`가 해시가 붙은 프론트엔드 자산에 HTTP 캐시 헤더를 붙인다. 이것도 Redis와 별개다.
+
 ```mermaid
 flowchart LR
     User[사용자 브라우저] --> Web[React + Vite]
@@ -53,32 +62,39 @@ flowchart LR
 
 ## 3. 주요 폴더와 책임
 
-```text
-Gimhae_si_Map/
-├─ src/
-│  ├─ app/                  앱 공급자와 라우터
-│  ├─ pages/                대시보드·로그인·관리자·404 화면
-│  ├─ components/
-│  │  ├─ map/               NAVER 지도·로드뷰와 지도 레이어
-│  │  └─ common/            연령 분포·장기 추이·지역 비교 차트
-│  ├─ features/
-│  │  ├─ population/        주민등록·유동인구 API 호출, 조회월·비교 로직
-│  │  ├─ boundaries/        GeoJSON 로딩과 공간 분석
-│  │  ├─ facilities/        주요 시설 API 호출
-│  │  ├─ development/       개발 고시 API 호출·구역 매칭
-│  │  └─ map/               지도 표시 로직
-│  └─ assets/               김해 캐릭터 등 화면 자산
-├─ public/data/             지도에 바로 올리는 GeoJSON
-├─ server/app/
-│  ├─ api/                  FastAPI 엔드포인트
-│  ├─ repositories/         SQLite 조회·저장
-│  ├─ services/             MOIS 등 외부 서비스 연동
-│  ├─ models.py             SQLAlchemy 테이블 모델
-│  └─ sync_*.py / import_*.py  데이터 동기화·가져오기 도구
-├─ server/data/             로컬 SQLite DB와 원본 데이터
-├─ tools/                   지도 표시용 GeoJSON 최적화 도구
-└─ docs/                    아키텍처와 인수인계 문서
-```
+처음 읽을 때는 `src/`가 **브라우저 화면**, `server/`가 **API와 데이터**, `public/data/`가 **지도 파일**이라는 세 덩어리로 보면 된다. 폴더 이름이 같아 보여도 `src/app/`은 프론트엔드 설정, `server/app/`은 백엔드 코드다.
+
+| 폴더·파일 | 맡은 일 | 먼저 볼 곳 |
+|---|---|---|
+| `src/` | React·TypeScript로 만든 브라우저 앱 전체 | `main.tsx` → `App.tsx` |
+| `src/app/` | 주소별 화면 연결과 TanStack Query 조회 캐시 설정 | `router.tsx`, `providers.tsx` |
+| `src/pages/` | 페이지 한 장의 구성·상태. `/`의 실제 화면은 대시보드 | `DashboardPage.tsx`; `/ui-concept`는 별도 시안 |
+| `src/components/map/` | NAVER 지도, 레이어, 로드뷰처럼 화면에 보이는 지도 부품 | `NaverMap.tsx` |
+| `src/components/common/` | 차트·지역 비교·고시 창 등 다른 화면에서도 쓸 수 있는 화면 부품 | `RegionComparisonTable.tsx` |
+| `src/features/population/` | 인구 API 요청, 저장 월 선택, 두 지역 비교·내보내기 로직 | `populationApi.ts` |
+| `src/features/boundaries/` | 행정·법정동 경계 파일 읽기, 교차·시설 개수 계산 | `boundaryLoader.ts` |
+| `src/features/facilities/` | 주요 시설 API 요청 | `facilityApi.ts` |
+| `src/features/development/` | 개발 고시 API 요청, 지도 구역과 고시 연결·선택 | `developmentApi.ts`, `developmentMatching.ts` |
+| `src/features/map/` | 지도에 표시할 값·표현을 계산하는 로직 | `mapPresentation.ts` |
+| `src/features/onboarding/` | 첫 방문 안내 저장 여부, 튜토리얼 카드 위치와 GeoJSON 지역 강조 범위 계산 | `welcomeGuideStorage.ts`, `regionTourBounds.ts` |
+| `src/lib/` | 여러 기능에서 공유하는 API 주소·성능 측정 도구 | `apiConfig.ts` |
+| `src/assets/`, `src/styles/` | 가져와 쓰는 이미지와 화면 스타일 시안 | `map_icon.png`, `neumorphic-dashboard.css` |
+| `src/**/*.test.ts` | 프론트엔드 기능별 자동 테스트 | 수정한 기능과 이름이 같은 테스트 |
+| `public/data/` | 브라우저가 직접 읽는 GeoJSON 경계·하천·도로·개발구역 파일. `*.render.geojson`은 표시용 결과물 | `gimhae_hangjeongdong.geojson` |
+| `server/app/` | FastAPI 서버 본체. `main.py`가 시작점이고 `db.py`가 SQLite 연결, `models.py`가 테이블 구조 | `main.py`, `db.py` |
+| `server/app/api/` | `/api/...` 요청을 받고 입력을 확인해 서비스로 넘김 | `population.py` |
+| `server/app/services/` | 조회 규칙·계산·외부 기관 API 연동 등 업무 로직 | `population_query_service.py` |
+| `server/app/repositories/` | SQLite 테이블에서 실제 데이터를 읽고 쓰는 코드 | `population_repository.py` |
+| `server/app/core/` | 서버 공통 환경 설정·시간 처리 | `config.py` |
+| `server/app/sync_*.py`, `import_*.py` | 외부 API·CSV를 받아 DB나 GeoJSON을 갱신하는 **별도 실행 명령**. 일반 화면 요청마다 실행되지 않음 | `sync_population.py`, `import_admin_csv.py` |
+| `server/app/audit_*.py`, `inspect_*.py` | 적재 결과와 외부 자료를 점검하는 도구 | `audit_population_coverage.py` |
+| `server/data/` | 로컬 SQLite DB 파일·원본 데이터 보관. DB 파일은 Git에 올리지 않음 | `gimhae_population.db` |
+| `server/tests/` | 백엔드 자동 테스트 | 수정한 API·서비스에 해당하는 테스트 |
+| `tools/` | GeoJSON 표시 파일 생성 등 개발 보조 도구 | `optimize-map-geojson.mjs` |
+| `docs/` | 아키텍처, 배포 점검, 이 인수인계 문서와 초보자용 코드 안내 | `beginner-code-guide.md` |
+| 저장소 최상단 설정 파일 | `package.json`은 프론트엔드 실행 명령·의존성, `server/requirements.txt`는 Python 의존성, `compose*.yaml`·`Dockerfile`·`Caddyfile`은 배포 설정 | 각 파일 자체 |
+
+한 기능을 따라갈 때는 `src/pages/DashboardPage.tsx` → 해당 `src/features/` → `server/app/api/` → `services/` → `repositories/` → SQLite 순서로 보면 된다. 지도 경계 파일은 이 API 경로와 달리 주로 `public/data/`에서 브라우저로 직접 들어온다. 더 쉬운 예시는 [초보자용 코드 읽기 안내](beginner-code-guide.md)에 정리했다.
 
 핵심 파일:
 
@@ -386,7 +402,7 @@ REM 저장 데이터 누락 점검(읽기 전용, 기간·출력 수 선택 가�
 
 ## 13. 알려진 한계와 확인할 사항
 
-1. **현재 Git 상태**: 2026-10-12 기준 `main`의 HEAD는 `bd5371b` (`feat: classify unverified official notices`)다. 이후 프론트엔드·백엔드·문서에 다수의 추적 파일 수정과 신규 미추적 파일이 있으며 아직 커밋하지 않았다. 다른 작업 산출물(`.docx_work/`, `_workspace/`, 문서 파일 등)도 미추적 상태이므로 일괄 정리·삭제·커밋하지 않는다. `.env`, `server/data/` 전체(DB·백업·수집 원본), 가상환경, 빌드 산출물은 Git에서 제외한다. 이 문서 갱신에서 원격 이력 확인·push는 하지 않았다.
+1. **현재 Git 상태**: 2026-10-21 작업 브랜치는 `feat/deploy-and-map-ui`다. 최신 커밋과 원격 반영 여부는 `git status -sb` 및 `git log -1 --oneline`으로 확인한다. 다른 작업 산출물(`.docx_work/`, `_workspace/`, 문서 파일 등)은 사용자 소유이므로 일괄 정리·삭제·커밋하지 않는다. `.env`, `server/data/` 전체(DB·백업·수집 원본), 가상환경, 빌드 산출물은 Git에서 제외한다.
 2. **공식 고시 링크**: 개발 고시 1,447건 중 949건을 김해시 공식 고시공고·토지이음·경상남도 공식 고시공고 상세 원문과 정확히 연결했다. 번호·날짜·정규화한 제목·발행기관이 모두 일치한 경우만 저장한다. 나머지 498건은 추정 URL을 만들지 않는다.
 3. **타 기관 고시**: 현재 연결 수는 김해시 903건, 경상남도 41건, 국토교통부 5건이다. 미확인 자료는 김해시 256건, 경상남도 229건, 국토교통부 13건이다. 경상남도 미확인 자료는 공식 게시판에 없거나 UPIS와 제목·게시일 표기가 달라 자동으로 연결하지 않았다. 토지이음 검색 목록에서 빠진 오래된 원문은 상세 화면을 직접 대조한 뒤 `VERIFIED_OFFICIAL_DETAIL_CANDIDATES`에 공식 상세 URL만 남긴다.
 4. **유동·주거인구**: 현재 준비된 공공 파일은 2021-10~2022-09 참고용이라 최신 분석에 쓰지 않기로 했다. 소상공인365는 이용 조건과 반출 가능 범위를 먼저 확인해야 한다.
@@ -417,6 +433,17 @@ REM 저장 데이터 누락 점검(읽기 전용, 기간·출력 수 선택 가�
 - 백엔드: `.venv\Scripts\python.exe -m compileall -q app` 통과. 새 전국 행정동 매칭·비교월·누락 점검 관련 13테스트 통과. `unittest discover -s tests -v` 전체 실행은 로컬 소켓 제한이 의심되는 지점에서 멈춰 중단했으므로 전체 통과라고 기록하지 않는다. 일반 CMD 등 제한 없는 환경에서 재실행할 것.
 - 위 테스트는 코드 검증이며 실제 SQLite 데이터의 최신 건수·누락 범위, NAVER 지도/로드뷰 동작, 모바일 화면은 이번 문서 갱신에서 다시 확인하지 않았다.
 
+## 13-3. 인앱 튜토리얼과 다른 PC에서 이어가기 (2026-10-21)
+
+- 첫 방문 인앱 튜토리얼은 `src/components/common/WelcomeGuide.tsx`의 5단계다. 왼쪽 `사용 안내`로 다시 볼 수 있고, 완료·건너뛰기는 브라우저 `localStorage`에 기록한다.
+- 지도 단계는 `src/features/onboarding/regionTourBounds.ts`가 GeoJSON 꼭짓점을 지도 픽셀로 투영한다. 사각형 전체가 아니라 실제 행정동 윤곽선(내부 구멍 포함)만 밝히고, 그 안을 누르면 해당 지역 상세를 선택한다. 지도 이동·크기 변경 시 강조 경계를 다시 계산한다.
+- 2026-10-21 작업 브랜치는 `feat/deploy-and-map-ui`이고 원격 `origin`은 위 GitHub URL이다. 다른 PC에서는 이 브랜치를 받아야 튜토리얼·지도 설정 변경을 볼 수 있다. 최신 반영 여부는 Git 상태를 확인한다.
+- 프론트엔드 검증: 12개 테스트 파일·43개 테스트, ESLint, 프로덕션 빌드 통과. 브라우저에서는 GeoJSON 모양 강조와 부원동 클릭 → 부원동 상세 전환을 확인했다. 당시 백엔드가 실행되지 않아 실제 인구 수치 조회까지 검증한 것은 아니다.
+
+다른 PC로 옮기기 전 이 PC에서 `git status --short`로 변경 파일을 검토하고, 프로젝트 코드·문서 중 필요한 것만 선택적으로 커밋한 뒤 현재 브랜치를 `origin`에 push한다. `.env`의 지도/API 키, `server/data/`의 SQLite DB·원본, `.docx_work/`·`_workspace/` 같은 개인 작업물을 무턱대고 포함하지 않는다. DB가 필요하면 Git과 별도로 안전하게 백업·복사한다.
+
+다른 PC에서는 같은 GitHub 계정으로 저장소를 받아 `feat/deploy-and-map-ui` 브랜치로 이동하고, `.env.example`을 바탕으로 그 PC의 `.env`를 다시 만든다. 프론트엔드는 `npm ci` 후 `npm run dev`; 백엔드는 별도 Python 가상환경을 만든 뒤 `server/requirements.txt`를 설치하고 DB 파일을 별도로 준비한다. 구체적인 순서는 [다른 PC 설정 안내](other-pc-setup.md)를 따른다. Codex 대화가 보이더라도 로컬 파일·키·DB가 자동으로 새 PC에 복사되는 것은 아니다.
+
 ## 14. 다음 작업 권장 순서
 
 1. 제한 없는 Windows 환경에서 백엔드 전체 테스트를 재실행하고, 지도·로드뷰·지역 비교 목록·모바일 배치를 브라우저에서 확인한다. 두 동 비교는 요청에 따라 계속 꺼 둔다.
@@ -427,10 +454,10 @@ REM 저장 데이터 누락 점검(읽기 전용, 기간·출력 수 선택 가�
 
 ## 15. 다음 채팅에 전달할 시작 문구
 
-아래 내용을 새 채팅의 첫 메시지로 붙여 넣으면 된다.
+아래 내용을 새 채팅의 첫 메시지로 붙여 넣으면 된다. 다른 PC에서는 먼저 저장소를 받아 프로젝트 폴더를 열고 이 문서를 함께 제공한다.
 
 ```text
-C:\Users\User\Documents\ChatGPT\Gimhae_si_Map 프로젝트 작업을 이어서 해줘.
+현재 열어 둔 Gimhae_si_Map 프로젝트 작업을 이어서 해줘.
 먼저 docs/project-handoff.md, docs/architecture.md, README.md를 전부 읽고 현재 git status와 관련 파일을 확인해줘.
 
 이 프로젝트는 React + TypeScript + Vite 프론트엔드, FastAPI + SQLite 백엔드, NAVER Maps를 사용하는 김해시 행정동/법정동 인구 GIS야. 기존 UI 스타일과 보안 원칙을 유지하고, 실제 파일을 확인하기 전에는 구조나 데이터 상태를 추정하지 마.
