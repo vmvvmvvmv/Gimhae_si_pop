@@ -98,6 +98,8 @@ def load_referenced_notice_ids() -> set[str]:
 
 
 def normalize_notice(item: dict[str, Any]) -> dict[str, object]:
+    # UPIS의 con1~con7 같은 원본 필드를 앱에서 읽기 쉬운 이름으로 바꿉니다.
+    # 공식 상세 원문 검증은 별도 동기화 단계에서 수행합니다.
     title = str(item.get("con2") or "").strip()
     notice_type_code = str(item.get("con3") or "").strip()
     notice_type = NOTICE_TYPES.get(notice_type_code, "기타 고시")
@@ -182,6 +184,8 @@ async def download_notices(
             )
             for row in rows:
                 source_id = str(row.get("con7") or "").strip()
+                # 제목에 개발 키워드가 없더라도 VWorld 구역이 직접 참조하는
+                # 고시는 보존해야 지도 도형과 고시의 연결이 끊기지 않습니다.
                 if (
                     not is_development_notice(row)
                     and source_id not in referenced_notice_ids
@@ -231,6 +235,8 @@ def main() -> None:
     )
     Base.metadata.create_all(bind=engine)
     with SessionLocal.begin() as db:
+        # 외부 페이지를 모두 받은 뒤에만 DB 저장을 시작합니다.
+        # 중간에 저장이 실패하면 이 블록 전체가 rollback됩니다.
         # 같은 기간을 다시 동기화할 때 필터에서 제외된 기존 행은 삭제하지
         # 않고 비활성화합니다. 원본 이력은 남기면서 화면에는 노출하지 않습니다.
         saved_count = replace_development_notices(

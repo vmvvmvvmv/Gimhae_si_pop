@@ -1,10 +1,11 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import AgeDistributionChart from '../components/common/AgeDistributionChart'
 import PopulationTrendChart from '../components/common/PopulationTrendChart'
 import RegionComparisonTable from '../components/common/RegionComparisonTable'
 import PopulationCsvExport from '../components/common/PopulationCsvExport'
 import TwoRegionComparison from '../components/common/TwoRegionComparison'
+import WelcomeGuide from '../components/common/WelcomeGuide'
 import NaverMap, {
   type AddressSearchRequest,
   type AddressSearchResult,
@@ -56,6 +57,10 @@ import {
   type MapControlPopover,
 } from '../features/map/mapPresentation'
 import { recordPerformanceMilestone } from '../lib/performanceMetrics'
+import {
+  rememberWelcomeGuide,
+  shouldShowWelcomeGuide,
+} from '../features/onboarding/welcomeGuideStorage'
 import './DashboardPage.css'
 
 interface SelectedRegion {
@@ -244,6 +249,7 @@ export default function DashboardPage() {
   // 이 페이지가 지도·조회 조건·선택 지역·상세 패널의 공통 상태를 소유합니다.
   // 지도와 목록 같은 자식 컴포넌트는 필요한 값과 선택 함수를 props로 받습니다.
   const mapHeadingRef = useRef<HTMLDivElement>(null)
+  const [isWelcomeGuideOpen, setIsWelcomeGuideOpen] = useState(shouldShowWelcomeGuide)
   const [boundaryType, setBoundaryType] =
     useState<BoundaryType>('administrative')
   const [selectedRegion, setSelectedRegion] =
@@ -280,6 +286,21 @@ export default function DashboardPage() {
   const [hideEndedDevelopmentAreas, setHideEndedDevelopmentAreas] =
     useState(false)
 
+  const closeWelcomeGuide = useCallback(() => {
+    // 완료와 건너뛰기를 모두 기록해 다음 방문에는 자동으로 다시 띄우지 않습니다.
+    rememberWelcomeGuide()
+    setIsWelcomeGuideOpen(false)
+  }, [])
+
+  const openWelcomeGuide = () => {
+    // 다시 볼 때 패널이 접혀 있으면 상세 정보 강조 대상이 보이지 않습니다.
+    setIsSidePanelCollapsed(false)
+    setIsWelcomeGuideOpen(true)
+  }
+
+  // 지도에서 동을 누르거나 검색 결과를 고르면 이 함수가 실행됩니다.
+  // 선택값은 여기서 기억하고,
+  // 아래의 지역별 조회와 상세 패널이 그 값을 함께 사용합니다.
   const selectRegion = (region: SelectedRegion) => {
     if (
       pairComparison?.pickingSecond &&
@@ -333,6 +354,8 @@ export default function DashboardPage() {
   }, [availableMonths])
 
   const effectiveStatsYm = useMemo(() => {
+    // 목록을 받기 전에는 202512를 임시로 쓰지만, 실제 요청은 아래
+    // populationQuery의 enabled 조건 때문에 저장된 월을 확인한 뒤 시작합니다.
     return selectPopulationMonth(
       availabilityItems,
       populationLevel,
@@ -370,6 +393,7 @@ export default function DashboardPage() {
   }, [availableMonths, effectiveYear])
 
   const populationQuery = useQuery({
+    // 행정동/법정동 또는 월이 바뀌면 queryKey가 달라져 해당 자료를 다시 읽습니다.
     queryKey: ['population', populationLevel, effectiveYear, effectiveMonth],
     queryFn: () =>
       fetchPopulation(populationLevel, effectiveYear, effectiveMonth),
@@ -458,6 +482,9 @@ export default function DashboardPage() {
   const developmentControlsOpen = openMapControl === 'development'
   const developmentPopoverOpen = developmentControlsOpen
   const facilityPopoverOpen = facilityControlsOpen
+  const activeFacilityLayerCount = visibleFacilityCategories.length
+    + Number(showMajorRoads)
+    + Number(showRoadTraffic)
 
   useEffect(() => {
     const heading = mapHeadingRef.current
@@ -562,6 +589,7 @@ export default function DashboardPage() {
         effectiveMonth,
       ),
     enabled: Boolean(
+      // 전국 유사 지역 비교는 행정동용 자료입니다. 법정동 선택 때는 요청하지 않습니다.
       selectedRegion && boundaryType === 'administrative' && availableMonths.length,
     ),
   })
@@ -644,6 +672,7 @@ export default function DashboardPage() {
   })
 
   const developmentAreasQuery = useQuery({
+    // 도형 파일은 검색하거나 개발계획을 볼 때만 읽어 첫 화면의 부담을 줄입니다.
     queryKey: ['development-areas'],
     queryFn: loadDevelopmentAreas,
     enabled:
@@ -655,6 +684,7 @@ export default function DashboardPage() {
   })
 
   const developmentNoticesQuery = useQuery({
+    // 도형은 GeoJSON, 고시 목록은 API/DB에서 옵니다. 아래에서 두 자료를 연결합니다.
     queryKey: ['development-notices'],
     queryFn: fetchDevelopmentNotices,
     enabled:
@@ -703,6 +733,7 @@ export default function DashboardPage() {
   )
 
   const filteredDevelopmentAreas = useMemo(() => {
+    // 연도·종료 상태를 먼저 거른 뒤 지도에 넘겨야 화면과 클릭 대상이 일치합니다.
     const collection = developmentAreasQuery.data
     if (!collection) return undefined
 
@@ -1056,6 +1087,14 @@ export default function DashboardPage() {
             주요 시설
           </div>
         </div>
+        <button
+          type="button"
+          className="dashboard-guide-trigger dashboard-guide-rail"
+          onClick={openWelcomeGuide}
+        >
+          <span aria-hidden="true">?</span>
+          사용 안내
+        </button>
         <div className="dashboard-rail-caption">GIMHAE GIS</div>
       </nav>
 
@@ -1311,6 +1350,14 @@ export default function DashboardPage() {
             </div>
           )}
         </form>
+        <button
+          type="button"
+          className="dashboard-guide-trigger dashboard-guide-mobile"
+          onClick={openWelcomeGuide}
+        >
+          <span aria-hidden="true">?</span>
+          사용 안내
+        </button>
       </section>
 
       <section className="dashboard-grid">
@@ -1333,50 +1380,50 @@ export default function DashboardPage() {
               <h2>{boundaryLabel} 인구 분포</h2>
             </div>
 
-            <div className="map-heading-tools">
+            <div className="map-heading-tools" id="map-settings">
               <div className="map-settings-group-label" aria-hidden="true">
                 <DashboardRailIcon name="layers" />
                 <span>지도 설정</span>
               </div>
-              <button
-                type="button"
-                className={`boundary-fill-toggle ${showBoundaryFill && !showRoadTraffic ? 'active' : ''}`}
-                aria-pressed={showBoundaryFill && !showRoadTraffic}
-                title={
-                  showRoadTraffic
-                    ? '도로 교통상황을 보는 동안 인구 색상은 잠시 숨깁니다.'
-                    : showBoundaryFill
-                    ? '색상 필터를 끄고 경계선만 표시'
-                    : '인구에 따른 색상 필터 표시'
-                }
-                disabled={showRoadTraffic}
-                onClick={() => setShowBoundaryFill((visible) => !visible)}
-              >
-                <i aria-hidden="true" />
-                색상 필터
-                {showBoundaryFill && !showRoadTraffic && (
-                  <span className="map-layer-state" aria-hidden="true">ON</span>
-                )}
-              </button>
-              <button
-                type="button"
-                className={`waterway-layer-toggle ${showWaterways ? 'active' : ''}`}
-                aria-pressed={showWaterways}
-                title={showWaterways ? '하천망 숨기기' : '하천망 표시'}
-                disabled={waterwaysQuery.isError}
-                onClick={() => setShowWaterways((visible) => !visible)}
-              >
-                <i aria-hidden="true" />
-                하천망
-                {showWaterways && (
-                  <span className="map-layer-state" aria-hidden="true">ON</span>
-                )}
-              </button>
+              <div className="map-quick-controls" role="group" aria-label="빠른 지도 레이어">
+                <button
+                  type="button"
+                  className={`boundary-fill-toggle ${showBoundaryFill && !showRoadTraffic ? 'active' : ''}`}
+                  aria-pressed={showBoundaryFill && !showRoadTraffic}
+                  title={
+                    showRoadTraffic
+                      ? '도로 교통상황을 보는 동안 인구 색상은 잠시 숨깁니다.'
+                      : showBoundaryFill
+                      ? '색상 필터를 끄고 경계선만 표시'
+                      : '인구에 따른 색상 필터 표시'
+                  }
+                  disabled={showRoadTraffic}
+                  onClick={() => setShowBoundaryFill((visible) => !visible)}
+                >
+                  <i aria-hidden="true" />
+                  색상 필터
+                  <span className="map-quick-indicator" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className={`waterway-layer-toggle ${showWaterways ? 'active' : ''}`}
+                  aria-pressed={showWaterways}
+                  title={showWaterways ? '하천망 숨기기' : '하천망 표시'}
+                  disabled={waterwaysQuery.isError}
+                  onClick={() => setShowWaterways((visible) => !visible)}
+                >
+                  <i aria-hidden="true" />
+                  하천망
+                  <span className="map-quick-indicator" aria-hidden="true" />
+                </button>
+              </div>
+              <div className="map-menu-controls" role="group" aria-label="상세 지도 레이어 설정">
               <div className="development-layer-control">
                 <button
                   type="button"
                   className={`development-layer-toggle ${showDevelopmentAreas ? 'active' : ''} ${developmentControlsOpen ? 'open' : ''}`}
                   aria-expanded={developmentControlsOpen}
+                  aria-haspopup="dialog"
                   aria-controls="development-filter-menu"
                   title="개발계획 표시와 필터 설정"
                   disabled={developmentAreasQuery.isError}
@@ -1385,8 +1432,9 @@ export default function DashboardPage() {
                   <i aria-hidden="true" />
                   개발계획
                   {showDevelopmentAreas && (
-                    <span className="map-layer-state" aria-hidden="true">ON</span>
+                    <span className="map-menu-state">ON</span>
                   )}
+                  <span className="map-menu-chevron" aria-hidden="true" />
                 </button>
                 {developmentPopoverOpen && (
                   <div
@@ -1423,20 +1471,20 @@ export default function DashboardPage() {
                       <div className="development-compact-options">
                         <label className="development-compact-year">
                           <span>고시연도</span>
-                        <select
-                          value={developmentYearFilter}
-                          onChange={(event) =>
-                            setDevelopmentYearFilter(event.target.value)
-                          }
-                        >
-                          <option value="all">전체 연도</option>
-                          <option value="unknown">연도 미확인</option>
-                          {developmentYearOptions.map((noticeYear) => (
-                            <option key={noticeYear} value={noticeYear}>
-                              {noticeYear}년
-                            </option>
-                          ))}
-                        </select>
+                          <select
+                            value={developmentYearFilter}
+                            onChange={(event) =>
+                              setDevelopmentYearFilter(event.target.value)
+                            }
+                          >
+                            <option value="all">전체 연도</option>
+                            <option value="unknown">연도 미확인</option>
+                            {developmentYearOptions.map((noticeYear) => (
+                              <option key={noticeYear} value={noticeYear}>
+                                {noticeYear}년
+                              </option>
+                            ))}
+                          </select>
                         </label>
                         <button
                           type="button"
@@ -1464,23 +1512,20 @@ export default function DashboardPage() {
                       type="button"
                       className={`facility-menu-toggle ${facilityControlsOpen ? 'open' : ''} ${visibleFacilityCategories.length || showMajorRoads || showRoadTraffic ? 'active' : ''}`}
                       aria-expanded={facilityControlsOpen}
-                      aria-pressed={Boolean(
-                        visibleFacilityCategories.length ||
-                        showMajorRoads ||
-                        showRoadTraffic
-                      )}
+                      aria-haspopup="dialog"
                       aria-controls="facility-layer-menu"
                       onClick={toggleFacilityControls}
                     >
                       <span>주요 시설</span>
-                      {(visibleFacilityCategories.length > 0 || showMajorRoads || showRoadTraffic) && (
-                        <small className="map-layer-state" aria-hidden="true">ON</small>
-                      )}
+                      <small className="map-menu-count">{activeFacilityLayerCount}개</small>
+                      <span className="map-menu-chevron" aria-hidden="true" />
                     </button>
                     {facilityPopoverOpen && (
                       <div
                         id="facility-layer-menu"
                         className="facility-popover"
+                        role="dialog"
+                        aria-label="주요 시설 지도 필터"
                       >
                         <div className="facility-popover-heading">
                           <strong>시설 레이어</strong>
@@ -1515,6 +1560,7 @@ export default function DashboardPage() {
                     {roadTrafficToggleButton}
                   </div>
                 )}
+              </div>
               </div>
               {populationMaximum > 0 && (
                 <div
@@ -2241,6 +2287,8 @@ export default function DashboardPage() {
           )}
         </aside>
       </section>
+
+      {isWelcomeGuideOpen && <WelcomeGuide onClose={closeWelcomeGuide} />}
 
     </main>
   )

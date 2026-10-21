@@ -17,6 +17,7 @@ class RegionNotFound(Exception):
 
 
 def _valid_stats_ym(value: str) -> bool:
+    # 라우터의 '숫자 6자리' 검사에 더해 실제 월이 1~12인지 확인합니다.
     return (
         len(value) == 6
         and value.isascii()
@@ -32,6 +33,8 @@ def read_stored_population(
     result = get_population(db, level, year, month)
     if result is not None:
         return result
+    # 자료가 없는 월은 서버 오류가 아닙니다. 빈 목록과 안내 정보를 주면
+    # 화면이 '아직 동기화되지 않음'을 오류와 구분해 표시할 수 있습니다.
     level_name = "행정동" if level == "admin" else "법정동"
     return {
         "level": level,
@@ -91,6 +94,7 @@ def read_similar_density(
     area_tolerance: float,
     boundary_year: int | None,
 ) -> dict[str, Any]:
+    # API의 연·월을 DB에서 쓰는 YYYYMM 문자열로 바꿔 조회합니다.
     result = get_similar_admin_density(
         db=db,
         region_code=region_code,
