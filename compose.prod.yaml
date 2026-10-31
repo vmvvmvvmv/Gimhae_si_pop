@@ -1,0 +1,45 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_NAVER_MAP_CLIENT_ID: ${VITE_NAVER_MAP_CLIENT_ID:?Set the NAVER Maps client ID in deploy.env}
+    image: gimhae-map:latest
+    restart: unless-stopped
+    environment:
+      ENABLE_LIVE_MOIS_PROXY: "false"
+    volumes:
+      - type: bind
+        source: ./server/data
+        target: /app/server/data
+        bind:
+          create_host_path: false
+    networks:
+      - app_net
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?Set the public domain in deploy.env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - app_net
+
+networks:
+  app_net:
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -189,11 +189,14 @@ export interface SimilarDensityResponse {
   }
 }
 
+// 이 파일은 브라우저와 FastAPI 사이의 통신만 담당합니다. 화면 상태는 DashboardPage가 관리합니다.
 export async function fetchPopulation(
   level: PopulationLevel,
   year: number,
   month: number,
 ): Promise<AdminPopulationResponse> {
+  // FastAPI의 level/year/month 이름과 같게 URL 쿼리를 만듭니다.
+  // 요청이 들어간 뒤에는 api/population.py → service → repository 순서로 갑니다.
   const params = new URLSearchParams({
     level,
     year: String(year),
@@ -223,6 +226,7 @@ export async function fetchPopulation(
     throw new Error(message)
   }
 
+  // 'as'는 TypeScript에게 응답 모양을 알려줄 뿐, 실행 중 검증을 하지는 않습니다.
   return (await response.json()) as AdminPopulationResponse
 }
 
@@ -234,6 +238,7 @@ export function fetchAdminPopulation(
 }
 
 export async function fetchPopulationAvailability(): Promise<PopulationAvailabilityResponse> {
+  // 실제 DB에 저장된 월을 먼저 알아야 빈 달을 기본값으로 선택하지 않습니다.
   const response = await fetch(`${API_BASE_URL}/population/availability`)
 
   if (!response.ok) {
@@ -320,6 +325,7 @@ export async function fetchSimilarDensity(
   year: number,
   month: number,
 ): Promise<SimilarDensityResponse> {
+  // area_tolerance=0.1은 선택 지역 면적의 ±10% 범위를 뜻합니다.
   const params = new URLSearchParams({
     region_code: regionCode,
     year: String(year),

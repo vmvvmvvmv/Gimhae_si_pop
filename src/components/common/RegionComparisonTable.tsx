@@ -1,88 +1,118 @@
 import { useMemo, useState } from 'react'
 import type { AdminPopulationRegion } from '../../features/population/populationApi'
 
-type SortKey = 'population' | 'area' | 'density'
+type SortKey = 'population' | 'increase' | 'decrease'
 
 interface RegionComparisonTableProps {
   items: AdminPopulationRegion[]
   levelLabel: string
+  selectedRegionCode: string
+  onSelectRegion: (region: AdminPopulationRegion) => void
 }
 
 const SORT_OPTIONS: Array<{ value: SortKey; label: string }> = [
-  { value: 'population', label: '총인구순' },
-  { value: 'density', label: '인구밀도순' },
-  { value: 'area', label: '면적순' },
+  { value: 'population', label: '인구 많은 순' },
+  { value: 'increase', label: '전월 증가 순' },
+  { value: 'decrease', label: '전월 감소 순' },
 ]
+
+function getMonthlyChange(item: AdminPopulationRegion): number | null {
+  return item.comparisons.previousMonth.change
+}
+
+function formatMonthlyComparison(item: AdminPopulationRegion): string {
+  const { change, changeRate } = item.comparisons.previousMonth
+  if (change === null || changeRate === null) return '전월 비교 없음'
+  if (change === 0) return '전월과 동일'
+  const sign = change > 0 ? '+' : ''
+  return `전월 ${sign}${changeRate.toFixed(2)}% · ${sign}${change.toLocaleString()}명`
+}
 
 export default function RegionComparisonTable({
   items,
   levelLabel,
+  selectedRegionCode,
+  onSelectRegion,
 }: RegionComparisonTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('population')
 
   const sortedItems = useMemo(
     () =>
       [...items].sort((left, right) => {
-        if (sortKey === 'area') {
-          return right.areaKm2 - left.areaKm2
+        if (sortKey === 'increase') {
+          return (getMonthlyChange(right) ?? Number.NEGATIVE_INFINITY) -
+            (getMonthlyChange(left) ?? Number.NEGATIVE_INFINITY)
         }
-
-        if (sortKey === 'density') {
-          return right.populationDensity - left.populationDensity
+        if (sortKey === 'decrease') {
+          return (getMonthlyChange(left) ?? Number.POSITIVE_INFINITY) -
+            (getMonthlyChange(right) ?? Number.POSITIVE_INFINITY)
         }
-
         return right.population - left.population
       }),
     [items, sortKey],
   )
 
   return (
-    <section className="comparison-table-card">
-      <div className="comparison-table-heading">
+    <section className="region-ranking" aria-label={`${levelLabel} 지역 비교`}>
+      <div className="region-ranking-heading">
         <div>
-          <span>지역 비교</span>
-          <h2>{levelLabel} 면적·인구 비교</h2>
+          <small>{levelLabel} 전체 비교</small>
+          <h3>인구·면적 지역 비교</h3>
         </div>
-
-        <label className="comparison-sort">
-          <span>정렬 기준</span>
-          <select
-            value={sortKey}
-            onChange={(event) => setSortKey(event.target.value as SortKey)}
-          >
-            {SORT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="region-ranking-controls">
+          <span>{items.length}개 지역</span>
+          <label>
+            <span className="sr-only">지역 비교 정렬 기준</span>
+            <select
+              value={sortKey}
+              onChange={(event) => setSortKey(event.target.value as SortKey)}
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
-
-      <div className="comparison-table-wrap">
-        <table className="comparison-table">
-          <thead>
-            <tr>
-              <th scope="col">순위</th>
-              <th scope="col">지역</th>
-              <th scope="col">총인구</th>
-              <th scope="col">면적(㎢)</th>
-              <th scope="col">인구밀도(명/㎢)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedItems.map((item, index) => (
-              <tr key={item.regionCode}>
-                <td>{index + 1}</td>
-                <th scope="row">{item.regionName}</th>
-                <td>{item.population.toLocaleString()}명</td>
-                <td>{item.areaKm2.toFixed(2)}</td>
-                <td>{item.populationDensity.toLocaleString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <ol className="region-ranking-list">
+        {sortedItems.map((item, index) => {
+          const change = getMonthlyChange(item)
+          const changeClass = change === null || change === 0
+            ? 'steady'
+            : change > 0
+              ? 'increase'
+              : 'decrease'
+          const selected = item.regionCode === selectedRegionCode
+          return (
+            <li key={item.regionCode}>
+              <button
+                type="button"
+                className={selected ? 'selected' : ''}
+                aria-current={selected ? 'true' : undefined}
+                onClick={() => onSelectRegion(item)}
+              >
+                <span className="region-rank">{index + 1}</span>
+                <span className="region-ranking-name">
+                  <strong>{item.regionName}</strong>
+                  <small className="region-ranking-meta">
+                    <span>면적 {item.areaKm2.toFixed(2)}㎢</span>
+                    <span>밀도 {item.populationDensity.toLocaleString()}명/㎢</span>
+                    <span className={`region-ranking-change ${changeClass}`}>
+                      {formatMonthlyComparison(item)}
+                    </span>
+                  </small>
+                </span>
+                <span className="region-ranking-population">
+                  <strong>{item.population.toLocaleString()}</strong>
+                  <small>명</small>
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ol>
     </section>
   )
 }

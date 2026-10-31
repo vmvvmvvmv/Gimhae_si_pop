@@ -38,7 +38,7 @@ export default function AgeDistributionChart({
           </>
         ) : (
           <span className="age-chart-hint">
-            연령대 막대에 마우스를 올리면 남성·여성 인원 수를 볼 수 있습니다.
+            막대에 마우스를 올리면 남녀 인구가 나옵니다.
           </span>
         )}
       </div>
