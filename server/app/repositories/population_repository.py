@@ -14,6 +14,7 @@ from ..models import (
     PopulationMonthly,
     Region,
 )
+from ..services.national_admin_matching import match_population_code, population_name_index
 from .area_repository import get_area_reference
 
 
@@ -120,10 +121,6 @@ def save_national_admin_population(
     return saved_count
 
 
-def _normalize_region_name(value: str) -> str:
-    return "".join(value.split()).replace("·", "")
-
-
 def get_similar_admin_density(
     db: Session,
     region_code: str,
@@ -152,6 +149,9 @@ def get_similar_admin_density(
     if target_population is None:
         return None
 
+    # 인구를 조회한 달과 가능한 가까운 경계 연도를 고릅니다.
+    # 과거 경계가 없으면 최신 경계를 쓰므로 옛날 행정구역과 정확히 같지는
+    # 않을 수 있습니다. 응답의 boundaryYear로 실제 기준을 알려 줍니다.
     selected_boundary_year = boundary_year
     if selected_boundary_year is None:
         selected_boundary_year = db.scalar(
@@ -206,6 +206,7 @@ def get_similar_admin_density(
     )
     min_area = target_area_km2 * (1 - area_tolerance)
     max_area = target_area_km2 * (1 + area_tolerance)
+    # 예: 허용 오차 0.1이면 선택 지역 면적의 90~110%인 곳만 후보입니다.
     candidate_conditions = [
         NationalAdministrativeArea.boundary_year == selected_boundary_year,
         NationalAdministrativeArea.area_km2 >= min_area,
@@ -221,37 +222,30 @@ def get_similar_admin_density(
         select(NationalAdministrativeArea).where(*candidate_conditions),
     ).all()
 
-    candidate_codes = [candidate.region_code for candidate in candidates]
-    candidate_names = [candidate.region_name for candidate in candidates]
     population_rows = db.scalars(
         select(NationalAdministrativePopulationMonthly).where(
-            or_(
-                NationalAdministrativePopulationMonthly.region_code.in_(
-                    candidate_codes,
-                ),
-                NationalAdministrativePopulationMonthly.region_name.in_(
-                    candidate_names,
-                ),
-            ),
             NationalAdministrativePopulationMonthly.stats_ym == stats_ym,
         ),
-    ).all() if candidate_codes else []
+    ).all() if candidates else []
     population_by_code = {
         row.region_code: row for row in population_rows
     }
-    population_by_name = {
-        _normalize_region_name(row.region_name): row
-        for row in population_rows
-    }
+    population_codes = set(population_by_code)
+    population_names = population_name_index(
+        (row.region_code, row.region_name) for row in population_rows
+    )
 
     matches: list[dict[str, Any]] = []
     for candidate in candidates:
-        population_row = (
-            population_by_code.get(candidate.region_code)
-            or population_by_name.get(
-                _normalize_region_name(candidate.region_name),
-            )
+        # SGIS 면적과 KOSIS 인구는 코드가 다를 수 있습니다. 같은 코드,
+        # 그다음 유일하게 일치하는 이름만 연결하고 애매하면 인구를 비워 둡니다.
+        matched_code = match_population_code(
+            candidate.region_code,
+            candidate.region_name,
+            population_codes,
+            population_names,
         )
+        population_row = population_by_code.get(matched_code)
         area_difference_km2 = candidate.area_km2 - target_area_km2
         area_difference_rate = (
             round(area_difference_km2 / target_area_km2 * 100, 2)
@@ -286,6 +280,8 @@ def get_similar_admin_density(
         item["population"] for item in comparable_matches
     )
     comparable_area = sum(item["areaKm2"] for item in comparable_matches)
+    # 지역별 밀도의 단순 평균이 아닌 총인구/총면적을 사용합니다.
+    # 면적이 큰 지역이 비교값에 더 크게 반영되는 가중 평균입니다.
     average_density = (
         round(comparable_population / comparable_area, 2)
         if comparable_area
@@ -348,6 +344,9 @@ def _density_snapshot(
 
 
 def get_population_availability(db: Session) -> dict[str, Any]:
+    # 저장된 지역 수와 활성 지역 수를 월마다 비교해 '완료/일부 적재'를 판별합니다.
+    # 그래서 브라우저는 최신 월이라는 이유만으로 자료가 덜 찬 월을
+    # 기본 선택하지 않을 수 있습니다.
     active_region_counts = dict(
         db.execute(
             select(Region.level, func.count(Region.id))
@@ -669,6 +668,7 @@ def get_population(
     ).all()
     comparison_month = shift_month(stats_ym, -1)
     comparison_year = shift_month(stats_ym, -12)
+    # 지역마다 DB를 다시 읽지 않고 현재·전월·전년 동월 행을 한 번에 가져옵니다.
     region_ids = [region.id for region in regions]
     if not region_ids:
         return None
@@ -688,6 +688,7 @@ def get_population(
         return None
 
     population_by_key = {
+        # (지역 ID, 연월)로 찾으면 아래 반복문에서 비교 월 행을 바로 꺼낼 수 있습니다.
         (row.region_id, row.stats_ym): row for row in population_rows
     }
     age_rows = db.scalars(
