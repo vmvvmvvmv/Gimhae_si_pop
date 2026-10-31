@@ -29,7 +29,10 @@ const EPSG_5186 =
 
 proj4.defs('EPSG:5186', EPSG_5186)
 
+// 원본 경계 좌표계(EPSG:5186)를 NAVER 지도에 표시할 위경도(EPSG:4326)로 바꿉니다.
 function transformCoordinates(value: unknown): unknown {
+  // GeoJSON은 [경도, 위도] 좌표가 여러 겹의 배열로 들어 있습니다.
+  // 가장 안쪽 숫자 쌍에서만 좌표계를 바꾸고 바깥 배열 모양은 유지합니다.
   if (!Array.isArray(value)) {
     return value
   }
@@ -56,6 +59,8 @@ export function normalizeBoundary(
 ): GeoJsonCollection {
   const crsName = collection.crs?.properties?.name ?? ''
 
+  // 이미 지도용 위경도라면 다시 변환하지 않습니다. 중복 변환은 경계를
+  // 엉뚱한 위치로 옮기므로 원본 파일의 좌표계 표기를 먼저 확인합니다.
   if (!crsName.includes('5186')) {
     return collection
   }
@@ -81,10 +86,11 @@ export function normalizeBoundary(
 export async function loadBoundary(
   boundaryType: BoundaryType,
 ): Promise<GeoJsonCollection> {
+  // 인구 통계는 API에서, 경계 모양은 가벼운 표시용 GeoJSON 파일에서 가져옵니다.
   const path =
     boundaryType === 'administrative'
-      ? '/data/gimhae_hangjeongdong.geojson'
-      : '/data/Gimhae_si.geojson'
+      ? '/data/gimhae_hangjeongdong.render.geojson'
+      : '/data/Gimhae_si.render.geojson'
 
   const response = await fetch(path)
 
@@ -119,7 +125,7 @@ export function getRegionCode(
 }
 
 export async function loadWaterways(): Promise<GeoJsonCollection> {
-  const response = await fetch('/data/gimhae_waterways.geojson')
+  const response = await fetch('/data/gimhae_waterways.render.geojson')
 
   if (!response.ok) {
     throw new Error('하천망 GeoJSON 파일을 불러오지 못했습니다.')
@@ -129,7 +135,7 @@ export async function loadWaterways(): Promise<GeoJsonCollection> {
 }
 
 export async function loadMajorRoads(): Promise<GeoJsonCollection> {
-  const response = await fetch('/data/gimhae_major_roads.geojson')
+  const response = await fetch('/data/gimhae_major_roads.render.geojson')
 
   if (!response.ok) {
     throw new Error('주요 도로 GeoJSON 파일을 불러오지 못했습니다.')
@@ -139,7 +145,7 @@ export async function loadMajorRoads(): Promise<GeoJsonCollection> {
 }
 
 export async function loadDevelopmentAreas(): Promise<GeoJsonCollection> {
-  const response = await fetch('/data/gimhae_development_areas.geojson')
+  const response = await fetch('/data/gimhae_development_areas.render.geojson')
 
   if (!response.ok) {
     throw new Error('개발 관련 구역 GeoJSON 파일을 불러오지 못했습니다.')

@@ -20,7 +20,11 @@ def replace_development_notices(
     to_date: str,
     notices: list[dict[str, object]],
 ) -> int:
-    """동기화 범위 비활성화와 신규 저장을 하나의 트랜잭션으로 실행합니다."""
+    """기존 고시를 비활성화하고 새 자료를 저장합니다.
+
+    호출자가 연 DB 트랜잭션 안에서 두 작업을 실행해야 중간 실패 시
+    비활성화까지 함께 취소됩니다. 이 함수 자체는 commit하지 않습니다.
+    """
     deactivate_development_notices_in_range(db, from_date, to_date)
     return upsert_development_notices(db, notices)
 

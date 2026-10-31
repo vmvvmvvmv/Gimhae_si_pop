@@ -16,12 +16,25 @@ class RegionNotFound(Exception):
     pass
 
 
+def _valid_stats_ym(value: str) -> bool:
+    # 라우터의 '숫자 6자리' 검사에 더해 실제 월이 1~12인지 확인합니다.
+    return (
+        len(value) == 6
+        and value.isascii()
+        and value.isdigit()
+        and 1 <= int(value[4:]) <= 12
+    )
+
+
 def read_stored_population(
     db: Session, level: PopulationLevel, year: int, month: int
 ) -> dict[str, Any]:
+    # 서비스는 DB 조회 결과를 화면에 전달할 형태로 정리하고, 없는 달도 구분합니다.
     result = get_population(db, level, year, month)
     if result is not None:
         return result
+    # 자료가 없는 월은 서버 오류가 아닙니다. 빈 목록과 안내 정보를 주면
+    # 화면이 '아직 동기화되지 않음'을 오류와 구분해 표시할 수 있습니다.
     level_name = "행정동" if level == "admin" else "법정동"
     return {
         "level": level,
@@ -47,6 +60,8 @@ def read_availability(db: Session) -> dict[str, Any]:
 def read_comparison(
     db: Session, level: PopulationLevel, region_code: str, base_ym: str, target_ym: str
 ) -> dict[str, Any]:
+    if not _valid_stats_ym(base_ym) or not _valid_stats_ym(target_ym):
+        raise ValueError("기준월과 비교월은 유효한 YYYYMM 형식이어야 합니다.")
     if base_ym == target_ym:
         raise ValueError("기준월과 비교월은 서로 달라야 합니다.")
     result = get_population_comparison(db, level, region_code, base_ym, target_ym)
@@ -79,6 +94,7 @@ def read_similar_density(
     area_tolerance: float,
     boundary_year: int | None,
 ) -> dict[str, Any]:
+    # API의 연·월을 DB에서 쓰는 YYYYMM 문자열로 바꿔 조회합니다.
     result = get_similar_admin_density(
         db=db,
         region_code=region_code,
