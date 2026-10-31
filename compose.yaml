@@ -1,0 +1,7 @@
+services:
+  app:
+    image: gimhae-map:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./server/data:/app/server/data

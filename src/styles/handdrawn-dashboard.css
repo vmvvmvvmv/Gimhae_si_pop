@@ -27,21 +27,7 @@
   font-family: Pretendard, 'Noto Sans KR', sans-serif;
 }
 
-.dashboard-header {
-  align-items: center;
-}
-
-.dashboard-header h1 {
-  color: var(--pencil);
-  font-size: clamp(36px, 5vw, 58px);
-  font-weight: 700;
-  text-shadow: 2px 2px 0 rgb(229 224 216 / 90%);
-  transform: rotate(-1deg);
-}
-
-.dashboard-header p:last-child,
 .filter-field,
-.filter-summary,
 .query-status,
 .detail-help,
 .comparison-sort {
@@ -60,11 +46,6 @@
   letter-spacing: 0.04em;
 }
 
-.dashboard-header h1 {
-  margin-top: 0;
-}
-
-.boundary-switch,
 .filter-card,
 .map-card,
 .detail-card,
@@ -75,30 +56,32 @@
   box-shadow: 5px 5px 0 var(--pencil);
 }
 
-.boundary-switch {
-  padding: 5px;
-  background: var(--old-paper);
-  transform: rotate(1deg);
+.dashboard-page .boundary-tabs {
+  border-bottom: 2px solid var(--old-paper);
 }
 
-.boundary-switch button {
-  min-height: 44px;
-  border: 2px solid transparent;
-  border-radius: 120px 15px 110px 14px / 14px 105px 15px 120px;
+.dashboard-page .boundary-tabs button {
+  min-height: 38px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
   color: var(--pencil);
+  background: transparent;
+  box-shadow: none;
   font-family: Pretendard, 'Noto Sans KR', sans-serif;
-  font-size: 17px;
+  font-size: 15px;
 }
 
-.boundary-switch button:hover {
-  color: #fff;
-  background: var(--marker-red);
+.dashboard-page .boundary-tabs button:hover {
+  color: var(--marker-red);
+  background: transparent;
 }
 
-.boundary-switch button.active {
-  color: #fff;
-  background: var(--ballpoint-blue);
-  box-shadow: 3px 3px 0 var(--pencil);
+.dashboard-page .boundary-tabs button.active {
+  border-bottom-color: var(--ballpoint-blue);
+  color: var(--ballpoint-blue);
+  background: transparent;
+  box-shadow: none;
 }
 
 .filter-card {
@@ -160,6 +143,7 @@
 /* 지도 상단 도구도 프로젝트의 손그림·포스터형 UI를 따릅니다. */
 .dashboard-page .boundary-fill-toggle,
 .dashboard-page .waterway-layer-toggle,
+.dashboard-page .road-traffic-layer-toggle,
 .dashboard-page .development-layer-toggle,
 .dashboard-page .facility-menu-toggle,
 .dashboard-page .facility-toggle {
@@ -182,6 +166,7 @@
 
 .dashboard-page .boundary-fill-toggle:hover,
 .dashboard-page .waterway-layer-toggle:hover,
+.dashboard-page .road-traffic-layer-toggle:hover,
 .dashboard-page .development-layer-toggle:hover,
 .dashboard-page .facility-menu-toggle:hover,
 .dashboard-page .facility-toggle:hover {
@@ -193,6 +178,7 @@
 
 .dashboard-page .boundary-fill-toggle:focus-visible,
 .dashboard-page .waterway-layer-toggle:focus-visible,
+.dashboard-page .road-traffic-layer-toggle:focus-visible,
 .dashboard-page .development-layer-toggle:focus-visible,
 .dashboard-page .facility-menu-toggle:focus-visible,
 .dashboard-page .facility-toggle:focus-visible {
@@ -224,6 +210,14 @@
   background: #a5d1f2;
   box-shadow: 3px 3px 0 var(--pencil);
   transform: rotate(0.45deg);
+}
+
+.dashboard-page .road-traffic-layer-toggle.active {
+  border-color: var(--pencil);
+  color: #fff;
+  background: #d2692f;
+  box-shadow: 3px 3px 0 var(--pencil);
+  transform: rotate(-0.35deg);
 }
 
 .dashboard-page .development-layer-toggle.active {
@@ -536,14 +530,6 @@
 }
 
 @media (max-width: 820px) {
-  .dashboard-header h1 {
-    font-size: 42px;
-  }
-
-  .boundary-switch {
-    transform: rotate(0);
-  }
-
   .filter-card,
   .map-card,
   .detail-card,

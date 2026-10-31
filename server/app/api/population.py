@@ -1,7 +1,7 @@
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -11,6 +11,11 @@ from ..services.mois_proxy_service import (
     fetch_live_population,
 )
 from ..services.population_service import PopulationLevel
+from ..services.population_export_service import (
+    NoExportData,
+    population_export_csv,
+    prepare_population_export,
+)
 from ..services.population_query_service import (
     RegionNotFound,
     read_availability,
@@ -21,6 +26,69 @@ from ..services.population_query_service import (
 
 
 router = APIRouter()
+
+
+def _read_export(
+    db: Session,
+    level: PopulationLevel,
+    scope: Literal["region", "month"],
+    fields: list[str],
+    region_code: str | None,
+    from_ym: str | None,
+    to_ym: str | None,
+    stats_ym: str | None,
+    region_codes: list[str] | None = None,
+) -> dict:
+    try:
+        return prepare_population_export(
+            db, level, scope, fields, region_code, from_ym, to_ym, stats_ym,
+            region_codes,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except NoExportData as error:
+        raise HTTPException(
+            status_code=404,
+            detail="선택한 범위에 저장된 인구 자료가 없습니다.",
+        ) from error
+
+
+@router.get("/api/population/export/preview")
+def population_export_preview(
+    level: PopulationLevel = Query("admin"),
+    scope: Literal["region", "month"] = Query(...),
+    fields: list[str] = Query(...),
+    region_code: str | None = Query(None, min_length=8, max_length=10, pattern=r"^\d{8,10}$"),
+    from_ym: str | None = Query(None),
+    to_ym: str | None = Query(None),
+    stats_ym: str | None = Query(None),
+    region_codes: list[str] | None = Query(None),
+    db: Session = Depends(get_db),
+) -> dict:
+    export = _read_export(db, level, scope, fields, region_code, from_ym, to_ym, stats_ym, region_codes)
+    return {"columns": export["columns"], "rows": export["rows"][:5], "count": export["count"]}
+
+
+@router.get("/api/population/export.csv")
+def download_population_export(
+    level: PopulationLevel = Query("admin"),
+    scope: Literal["region", "month"] = Query(...),
+    fields: list[str] = Query(...),
+    region_code: str | None = Query(None, min_length=8, max_length=10, pattern=r"^\d{8,10}$"),
+    from_ym: str | None = Query(None),
+    to_ym: str | None = Query(None),
+    stats_ym: str | None = Query(None),
+    region_codes: list[str] | None = Query(None),
+    db: Session = Depends(get_db),
+) -> Response:
+    export = _read_export(db, level, scope, fields, region_code, from_ym, to_ym, stats_ym, region_codes)
+    period = stats_ym if scope == "month" else f"{from_ym}-{to_ym}"
+    filename = f"gimhae_population_{level}_{scope}_{period}.csv"
+    return Response(
+        content=population_export_csv(export),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 def live_proxy_http_error(error: LiveProxyError, *, age: bool) -> HTTPException:
@@ -82,6 +150,8 @@ async def region_population(
     month: int = Query(12, ge=1, le=12),
     db: Session = Depends(get_db),
 ) -> JSONResponse:
+    # Query가 형식·범위(예: month 1~12)를 검사합니다. 실제 DB 조회와
+    # '저장되지 않은 월' 응답은 population_query_service가 결정합니다.
     return JSONResponse(
         content=read_stored_population(db, level, year, month),
         media_type="application/json; charset=utf-8",
@@ -110,11 +180,14 @@ async def population_comparison(
     target_ym: str = Query(..., min_length=6, max_length=6, pattern=r"^\d{6}$"),
     db: Session = Depends(get_db),
 ) -> JSONResponse:
+    # Query는 YYYYMM의 모양만 검사합니다. 202613처럼 실제로 없는 월과
+    # 같은 달끼리의 비교는 서비스가 검사하고 여기서 400으로 바꿉니다.
     try:
         result = read_comparison(db, level, region_code, base_ym, target_ym)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     except RegionNotFound as error:
+        # 서비스의 지역 없음 예외를 브라우저가 이해할 HTTP 404로 변환합니다.
         raise HTTPException(status_code=404, detail="지역을 찾을 수 없습니다.") from error
 
     return JSONResponse(

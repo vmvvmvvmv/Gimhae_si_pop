@@ -1,0 +1,12 @@
+.git
+.env
+.env.*
+deploy.env
+node_modules
+dist
+server/.venv
+server/data
+.docx_work
+_workspace
+**/__pycache__
+*.pyc
