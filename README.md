@@ -50,7 +50,7 @@
 | `src/` | React 화면과 API 클라이언트 |
 | `server/app/` | FastAPI, 데이터 저장·수집 명령 |
 | `public/data/` | 브라우저에서 사용하는 공개 GeoJSON 자료 |
-| `docs/` | 구조, 데이터 출처, 배포 및 개발 안내 |
+| `docs/images/` | README에 사용한 지도와 화면 이미지 |
 
 ## 로컬 실행
 
@@ -72,13 +72,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
 ```
 
-기존 DB가 없으면 인구 조회 결과가 비어 있을 수 있습니다. 데이터 수집·가져오기 방법은 [프로젝트 인수인계 문서](docs/project-handoff.md)를 참고하세요.
-
-## 배포 및 개발 문서
-
-- [구조 및 데이터 흐름](docs/architecture.md)
-- [개발 환경 이전](docs/other-pc-setup.md)
-- [코드 읽기 안내](docs/beginner-code-guide.md)
+기존 DB가 없으면 인구 조회 결과가 비어 있을 수 있습니다.
 
 ## 검증
 
