@@ -1,0 +1,39 @@
+.report-figures-page {
+  min-height: 100dvh;
+  color: #1d2b3d;
+  background: #eef2f5;
+}
+
+.report-figures-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem clamp(1rem, 4vw, 3rem);
+  color: #fff;
+  background: #245b9f;
+}
+
+.report-figures-header a {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.report-figures-header a:hover,
+.report-figures-header a:focus-visible {
+  text-decoration: underline;
+}
+
+.report-figures-header span {
+  font-size: .75rem;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.report-figures-content {
+  width: min(100% - 2rem, 1200px);
+  margin: 0 auto;
+  padding: clamp(1.5rem, 4vw, 3rem) 0 4rem;
+}
+
+

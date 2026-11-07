@@ -28,7 +28,7 @@ def row_code(row: dict[str, Any]) -> str:
     return ""
 
 def extract_national_population(items: list[dict[str, Any]]) -> int:
-    """Return the nationwide total without double-counting aggregate rows."""
+    """집계 행을 중복 계산하지 않고 전국 인구를 반환합니다."""
     if not items:
         return 0
 
@@ -40,8 +40,8 @@ def extract_national_population(items: list[dict[str, Any]]) -> int:
     if nationwide_rows:
         return to_int(nationwide_rows[0].get("totNmprCnt"))
 
-    # The level-1 response is normally a list of 시도 rows. Deduplicate by
-    # administrative code in case the upstream service repeats a row.
+    # 1단계 응답은 보통 시도별 행 목록입니다. 원천 서비스가 같은 행을
+    # 반복할 수 있으므로 행정구역 코드로 중복을 제거합니다.
     unique_rows: dict[str, dict[str, Any]] = {}
     rows_without_code: list[dict[str, Any]] = []
     for item in items:

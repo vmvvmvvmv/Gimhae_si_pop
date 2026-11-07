@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 
 from .db import SessionLocal
 from .import_national_admin_areas import import_areas
+from .services.sync_lock import SyncAlreadyRunning
 from .models import NationalAdministrativeArea
 from .sync_sgis_admin_areas import (
     download_national_admin_areas,
@@ -76,6 +77,8 @@ async def sync_year(
                 status="completed",
                 feature_count=saved_count or feature_count,
             )
+        except SyncAlreadyRunning:
+            raise
         except Exception as exc:  # 연도별 실패를 기록하고 다음 연도를 계속 처리합니다.
             last_error = exc
             if attempt <= retry_count:

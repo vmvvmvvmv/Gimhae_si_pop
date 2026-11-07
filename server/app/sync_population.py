@@ -9,6 +9,7 @@ from .services.population_service import (
     PopulationLevel,
     get_region_population,
 )
+from .services.sync_lock import sync_lock
 
 
 async def sync_population(
@@ -59,7 +60,8 @@ def main() -> None:
     if not 1 <= args.month <= 12:
         raise SystemExit("month는 1부터 12까지 입력해야 합니다.")
 
-    asyncio.run(sync_population(args.level, args.year, args.month))
+    with sync_lock("database"):
+        asyncio.run(sync_population(args.level, args.year, args.month))
 
 
 if __name__ == "__main__":

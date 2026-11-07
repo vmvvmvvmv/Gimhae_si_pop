@@ -13,6 +13,7 @@ import httpx
 from .core.time import utc_now
 from .db import Base, SessionLocal, engine
 from .services.development_sync_service import replace_development_notices
+from .services.sync_lock import sync_lock
 
 
 UPIS_BASE_URL = "https://gimhae.go.kr/upis"
@@ -219,32 +220,33 @@ def main() -> None:
         if len(value) != 8 or not value.isdigit():
             raise ValueError(f"{label}은 YYYYMMDD 형식이어야 합니다.")
 
-    referenced_notice_ids = load_referenced_notice_ids()
-    print(
-        "VWorld 개발구역 참조 고시 식별자: "
-        f"{len(referenced_notice_ids)}개"
-    )
-    notices = asyncio.run(
-        download_notices(
-            args.from_date,
-            args.to_date,
-            args.delay_seconds,
-            args.max_pages,
-            referenced_notice_ids,
+    with sync_lock("database"):
+        referenced_notice_ids = load_referenced_notice_ids()
+        print(
+            "VWorld 개발구역 참조 고시 식별자: "
+            f"{len(referenced_notice_ids)}개"
         )
-    )
-    Base.metadata.create_all(bind=engine)
-    with SessionLocal.begin() as db:
-        # 외부 페이지를 모두 받은 뒤에만 DB 저장을 시작합니다.
-        # 중간에 저장이 실패하면 이 블록 전체가 rollback됩니다.
-        # 같은 기간을 다시 동기화할 때 필터에서 제외된 기존 행은 삭제하지
-        # 않고 비활성화합니다. 원본 이력은 남기면서 화면에는 노출하지 않습니다.
-        saved_count = replace_development_notices(
-            db,
-            from_date=args.from_date,
-            to_date=args.to_date,
-            notices=notices,
+        notices = asyncio.run(
+            download_notices(
+                args.from_date,
+                args.to_date,
+                args.delay_seconds,
+                args.max_pages,
+                referenced_notice_ids,
+            )
         )
+        Base.metadata.create_all(bind=engine)
+        with SessionLocal.begin() as db:
+            # 외부 페이지를 모두 받은 뒤에만 DB 저장을 시작합니다.
+            # 중간에 저장이 실패하면 이 블록 전체가 rollback됩니다.
+            # 같은 기간을 다시 동기화할 때 필터에서 제외된 기존 행은 삭제하지
+            # 않고 비활성화합니다. 원본 이력은 남기면서 화면에는 노출하지 않습니다.
+            saved_count = replace_development_notices(
+                db,
+                from_date=args.from_date,
+                to_date=args.to_date,
+                notices=notices,
+            )
 
     print(f"김해시 UPIS 개발 관련 고시 동기화 완료: {saved_count}건")
 

@@ -5,6 +5,7 @@ from sqlalchemy import select
 
 from .db import Base, SessionLocal, engine
 from .models import Region
+from .services.sync_lock import database_write_lock
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -115,6 +116,7 @@ def seed_regions() -> int:
     return inserted_count
 
 
+@database_write_lock
 def main() -> None:
     Base.metadata.create_all(bind=engine)
     inserted_count = seed_regions()

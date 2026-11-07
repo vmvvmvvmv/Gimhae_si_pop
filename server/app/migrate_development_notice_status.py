@@ -3,6 +3,7 @@
 from sqlalchemy import inspect, text
 
 from .db import engine
+from .services.sync_lock import database_write_lock
 
 
 OFFICIAL_URL_PATTERNS = (
@@ -12,6 +13,7 @@ OFFICIAL_URL_PATTERNS = (
 )
 
 
+@database_write_lock
 def migrate() -> None:
     columns = {
         column["name"]

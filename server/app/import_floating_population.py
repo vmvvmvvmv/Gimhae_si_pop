@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from .db import SessionLocal
 from .models import FloatingPopulationMonthly, Region
+from .services.sync_lock import sync_lock
 
 
 FIELD_ALIASES = {
@@ -173,7 +174,11 @@ def main() -> None:
     if not args.file.exists():
         raise SystemExit(f"CSV 파일을 찾을 수 없습니다: {args.file}")
 
-    rows_count, saved_count = import_rows(args.file, args.dry_run)
+    if args.dry_run:
+        rows_count, saved_count = import_rows(args.file, True)
+    else:
+        with sync_lock("database"):
+            rows_count, saved_count = import_rows(args.file, False)
     if not args.dry_run:
         print(f"CSV 행 수: {rows_count}")
         print(f"저장된 행정동·월 조합 수: {saved_count}")

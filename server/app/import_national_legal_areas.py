@@ -12,8 +12,10 @@ from sqlalchemy import select
 from .core.time import utc_now
 from .db import SessionLocal
 from .models import NationalLegalArea
+from .services.sync_lock import database_write_lock
 
 
+@database_write_lock
 def import_legal_areas(
     geojson_path: Path,
     reference_year: int,

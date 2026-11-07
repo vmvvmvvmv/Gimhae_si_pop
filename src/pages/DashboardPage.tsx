@@ -1,5 +1,6 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import AgeDistributionChart from '../components/common/AgeDistributionChart'
 import PopulationTrendChart from '../components/common/PopulationTrendChart'
 import RegionComparisonTable from '../components/common/RegionComparisonTable'
@@ -1086,6 +1087,10 @@ export default function DashboardPage() {
             <DashboardRailIcon name="facility" />
             주요 시설
           </div>
+          <Link to="/report-figures">
+            <DashboardRailIcon name="layers" />
+            GIS 자료
+          </Link>
         </div>
         <button
           type="button"
@@ -1095,6 +1100,10 @@ export default function DashboardPage() {
           <span aria-hidden="true">?</span>
           사용 안내
         </button>
+        <a className="dashboard-guide-trigger dashboard-guide-rail" href="/account">
+          <span aria-hidden="true">@</span>
+          내 계정
+        </a>
         <div className="dashboard-rail-caption">GIMHAE GIS</div>
       </nav>
 
@@ -1181,6 +1190,9 @@ export default function DashboardPage() {
           statsYm={effectiveStatsYm}
           availableMonths={availableMonths}
         />
+        <Link className="dashboard-figure-mobile-link" to="/report-figures">
+          GIS 자료
+        </Link>
 
         {populationQuery.isFetching && (
           <span className="query-status loading" role="status">

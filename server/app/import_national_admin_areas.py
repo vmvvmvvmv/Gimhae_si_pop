@@ -12,6 +12,7 @@ from sqlalchemy import select
 from .db import SessionLocal
 from .core.time import utc_now
 from .models import NationalAdministrativeArea
+from .services.sync_lock import database_write_lock
 
 
 def get_source_crs(geojson: dict, fallback_crs: str) -> CRS:
@@ -30,6 +31,7 @@ def get_source_crs(geojson: dict, fallback_crs: str) -> CRS:
     return CRS.from_user_input(fallback_crs)
 
 
+@database_write_lock
 def import_areas(
     geojson_path: Path,
     boundary_year: int,

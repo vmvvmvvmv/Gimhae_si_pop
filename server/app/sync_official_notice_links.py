@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, urlencode, urljoin, urlparse
 import httpx
 
 from .db import SessionLocal
+from .services.sync_lock import database_write_lock
 from .services.development_sync_service import (
     load_official_link_targets,
     save_official_notice_urls,
@@ -760,6 +761,7 @@ def load_notices(
         ]
 
 
+@database_write_lock
 def save_matches(results: list[MatchResult]) -> int:
     matched = {
         result.source_id: result.official_url

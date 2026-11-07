@@ -327,7 +327,8 @@ async def get_region_population_range(
                     ):
                         return result
                     last_error = (
-                        result.result_message or result.result_code
+                        f"{endpoint_key} API 코드 {result.result_code}: "
+                        f"{result.result_message or '오류 설명 없음'}"
                     )
                 except (httpx.HTTPError, ValueError) as error:
                     last_error = str(error)
