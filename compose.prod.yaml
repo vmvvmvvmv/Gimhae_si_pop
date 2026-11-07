@@ -1,3 +1,10 @@
+# 컨테이너 로그가 디스크를 채우지 않도록 파일당 10MB, 최대 5개까지만 보관합니다.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   app:
     build:
@@ -7,6 +14,7 @@ services:
         VITE_NAVER_MAP_CLIENT_ID: ${VITE_NAVER_MAP_CLIENT_ID:?Set the NAVER Maps client ID in deploy.env}
     image: gimhae-map:latest
     restart: unless-stopped
+    logging: *default-logging
     environment:
       ENABLE_LIVE_MOIS_PROXY: "false"
       ADMIN_USERNAME: ${ADMIN_USERNAME:?Set ADMIN_USERNAME in deploy.env}
@@ -28,6 +36,7 @@ services:
     image: gimhae-map:latest
     pull_policy: never
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       app:
         condition: service_healthy
@@ -47,6 +56,7 @@ services:
   caddy:
     image: caddy:2
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       app:
         condition: service_healthy
