@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { API_BASE_URL } from '../lib/apiConfig'
+import './AuthPages.css'
 import { loginUrlFor } from '../lib/authRedirect'
 
 export default function AccountPage() {
@@ -23,9 +24,9 @@ export default function AccountPage() {
       .catch(() => setState('unauthenticated'))
   }, [])
 
-  if (state === 'loading') return <main><p>확인 중…</p></main>
+  if (state === 'loading') return <main className="auth-page"><p>확인 중…</p></main>
   if (state === 'unauthenticated') {
-    return <main><p>로그인이 필요합니다.</p><a href={loginUrlFor('/account')}>로그인으로 이동</a></main>
+    return <main className="auth-page"><p>로그인이 필요합니다.</p><a href={loginUrlFor('/account')}>로그인으로 이동</a></main>
   }
 
   const change = async (event: FormEvent<HTMLFormElement>) => {
@@ -54,7 +55,7 @@ export default function AccountPage() {
   }
 
   return (
-    <main>
+    <main className="auth-page">
       <h1>내 계정</h1>
       <p>{username}님으로 로그인했습니다.</p>
       <h2>비밀번호 변경</h2>

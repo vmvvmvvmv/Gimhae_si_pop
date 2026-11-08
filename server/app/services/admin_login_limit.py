@@ -45,9 +45,11 @@ class LoginRateLimiter:
         finally:
             db.close()
 
-    def reserve(self, client_key: str, now: float | None = None) -> int:
+    def reserve(self, client_key: str, now: float | None = None,
+                max_attempts: int | None = None) -> int:
         """비밀번호 검사 한 건을 예약하고, 차단 중이면 대기 시간을 초로 반환합니다."""
         current = time.time() if now is None else now
+        limit = self.max_attempts if max_attempts is None else max_attempts
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             db.execute(
@@ -63,7 +65,7 @@ class LoginRateLimiter:
             if row and row[2] > current:
                 return math.ceil(row[2] - current)
             if row and current - row[0] < self.window_seconds:
-                if row[1] >= self.max_attempts:
+                if row[1] >= limit:
                     db.execute(
                         "UPDATE admin_login_attempts SET blocked_until = ? WHERE client_key = ?",
                         (current + self.block_seconds, client_key),

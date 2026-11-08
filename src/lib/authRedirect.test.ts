@@ -107,6 +107,11 @@ describe('requestLogin cooldown', () => {
       // React Query 자동 재시도(약 1초 뒤)가 와도 창을 다시 띄우지 않습니다.
       await expect(auth.requestLogin()).resolves.toBe(false)
       expect(events.length).toBe(1)
+      // 직접 누른 로그인 버튼은 대기 시간과 상관없이 창을 엽니다.
+      void auth.requestLogin(true)
+      expect(events.length).toBe(2)
+      auth.finishLogin(true)
+      expect(events.at(-1)).toBe(auth.SESSION_CHANGED_EVENT)
     } finally {
       vi.unstubAllGlobals()
     }

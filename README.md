@@ -74,6 +74,20 @@ python -m venv .venv
 
 기존 DB가 없으면 인구 조회 결과가 비어 있을 수 있습니다.
 
+### 로그인 설정
+
+`.env`의 `ADMIN_PASSWORD_HASH`와 `ADMIN_SESSION_SECRET`이 비어 있으면 로그인이 503으로 실패합니다. `server` 폴더에서 값을 만들어 프로젝트 루트의 `.env`에 넣습니다. 해시는 `$`가 들어 있으므로 작은따옴표로 감쌉니다.
+
+```powershell
+.\.venv\Scripts\python.exe -m app.services.admin_auth
+.\.venv\Scripts\python.exe -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+- `ADMIN_PASSWORD_HASH`는 관리자 계정이 처음 만들어질 때만 쓰입니다. 이후 값을 바꿔도 적용되지 않습니다.
+- 비밀번호는 `/account`나 `/admin`에서 바꿉니다. 잊었을 때는 `.\.venv\Scripts\python.exe -m app.reset_admin_password admin`을 실행합니다.
+- 로그인을 5번 틀리면 같은 IP에서 15분 동안 막힙니다. 로컬에서 바로 풀려면 서버를 끄고 `server\data\admin_login_attempts.db`를 지웁니다.
+- 30분 동안 요청이 없거나 로그인 후 8시간이 지나면 다시 로그인해야 합니다.
+
 ## 검증
 
 ```powershell

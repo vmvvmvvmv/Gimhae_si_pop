@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { API_BASE_URL } from '../lib/apiConfig'
+import './AuthPages.css'
 
 async function failureMessage(response: Response, fallback: string): Promise<string> {
   const body = await response.json().catch(() => ({})) as { detail?: string }
@@ -55,7 +56,7 @@ export default function PasswordResetPage() {
 
   if (step === 'done') {
     return (
-      <main>
+      <main className="auth-page">
         <h1>비밀번호가 바뀌었습니다</h1>
         <a href="/login">새 비밀번호로 로그인</a>
       </main>
@@ -64,7 +65,7 @@ export default function PasswordResetPage() {
 
   if (step === 'confirm') {
     return (
-      <main>
+      <main className="auth-page">
         <h1>비밀번호 재설정</h1>
         <p>관리자가 승인하면 일회용 코드를 알려 줍니다. 코드는 30분 동안만 유효합니다.</p>
         <form onSubmit={confirmReset}>
@@ -88,7 +89,7 @@ export default function PasswordResetPage() {
   }
 
   return (
-    <main>
+    <main className="auth-page">
       <h1>비밀번호 재설정 요청</h1>
       <p>아이디를 입력하면 관리자에게 재설정 요청이 전달됩니다.</p>
       <form onSubmit={requestReset}>

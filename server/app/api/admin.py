@@ -31,6 +31,8 @@ from ..services.admin_login_limit import LoginRateLimiter
 
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+# 여러 IP로 한 계정을 노리는 시도를 막습니다. 다른 사람이 일부러 계정을 잠그기 어렵도록 IP 제한(5회)보다 넉넉하게 둡니다.
+ACCOUNT_MAX_LOGIN_ATTEMPTS = 20
 sync_jobs = SyncJobManager()
 login_limiter = LoginRateLimiter()
 
@@ -59,14 +61,20 @@ def admin_login(payload: LoginRequest, response: Response, request: Request) -> 
     if not admin_auth_configured():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="관리자 인증이 설정되지 않았습니다.",
+            detail="로그인 설정이 없습니다. .env의 ADMIN_PASSWORD_HASH와 ADMIN_SESSION_SECRET을 확인하세요.",
         )
     client_ip = _client_ip(request)
     login_name = normalize_username(payload.username)
     client_key = hmac.new(
         ADMIN_SESSION_SECRET.encode("utf-8"), client_ip.encode("utf-8"), hashlib.sha256,
     ).hexdigest()
-    retry_after = login_limiter.reserve(client_key)
+    account_key = hmac.new(
+        ADMIN_SESSION_SECRET.encode("utf-8"), f"account:{login_name}".encode("utf-8"), hashlib.sha256,
+    ).hexdigest()
+    retry_after = (
+        login_limiter.reserve(client_key)
+        or login_limiter.reserve(account_key, max_attempts=ACCOUNT_MAX_LOGIN_ATTEMPTS)
+    )
     if retry_after:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -81,6 +89,7 @@ def admin_login(payload: LoginRequest, response: Response, request: Request) -> 
             detail="아이디 또는 비밀번호가 올바르지 않습니다.",
         )
     login_limiter.clear(client_key)
+    login_limiter.clear(account_key)
     audit_log.record(login_name, "login_success", ip=client_ip)
 
     from ..services.admin_auth import issue_session, password_fingerprint

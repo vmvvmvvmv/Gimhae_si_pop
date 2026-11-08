@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { API_BASE_URL } from '../lib/apiConfig'
+import './AuthPages.css'
 
 export default function SignupPage() {
   const [username, setUsername] = useState('')
@@ -38,7 +39,7 @@ export default function SignupPage() {
 
   if (submitted) {
     return (
-      <main>
+      <main className="auth-page">
         <h1>가입 신청이 접수되었습니다</h1>
         <p>관리자가 승인하면 로그인할 수 있습니다. 승인 전에는 로그인이 되지 않습니다.</p>
         <a href="/login">로그인 화면으로</a>
@@ -47,7 +48,7 @@ export default function SignupPage() {
   }
 
   return (
-    <main>
+    <main className="auth-page">
       <h1>회원가입 신청</h1>
       <p>신청 후 관리자가 승인해야 계정이 만들어집니다.</p>
       <form onSubmit={submit}>

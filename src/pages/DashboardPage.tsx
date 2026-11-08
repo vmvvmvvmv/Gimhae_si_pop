@@ -45,6 +45,7 @@ import {
   type FacilityItem,
 } from '../features/facilities/facilityApi'
 import mapIcon from '../assets/map_icon.png'
+import AccountMenu from './dashboard/AccountMenu'
 import { DashboardRailIcon } from './dashboard/DashboardRailIcon'
 import { BoundaryFilter, PeriodFilters } from './dashboard/DashboardFilters'
 import { formatChange, formatLegendPopulation, getFeatureCenter, getSearchScore, normalizeSearchText } from './dashboard/dashboardFormat'
@@ -1188,6 +1189,7 @@ export default function DashboardPage() {
           <span aria-hidden="true">?</span>
           사용 안내
         </button>
+        <AccountMenu />
       </section>
 
       <section className="dashboard-grid">

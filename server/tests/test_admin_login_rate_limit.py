@@ -67,7 +67,7 @@ class LoginRateLimitTests(unittest.TestCase):
              patch("app.services.admin_auth.issue_session", return_value="signed-session"):
             limiter.reserve.return_value = 0
             admin_login(LoginRequest(username="admin", password="correct"), response, request)
-        limiter.clear.assert_called_once()
+        self.assertEqual(limiter.clear.call_count, 2)
         self.assertIn("gimhae_admin_session", response.headers["set-cookie"])
 
 

@@ -34,6 +34,8 @@ class AdminSessionStore:
             if "pwd_fp" not in columns:
                 # 이전 버전에서 만든 DB에는 열이 없으므로 추가합니다. 빈 값 세션은 다음 검사에서 거부됩니다.
                 db.execute("ALTER TABLE admin_sessions ADD COLUMN pwd_fp TEXT NOT NULL DEFAULT ''")
+            if "last_seen" not in columns:
+                db.execute("ALTER TABLE admin_sessions ADD COLUMN last_seen INTEGER NOT NULL DEFAULT 0")
             # 대문자로 저장된 예전 세션도 계정별 로그아웃 대상이 되게 맞춥니다.
             db.execute("UPDATE admin_sessions SET username = lower(username) WHERE username <> lower(username)")
 
@@ -55,17 +57,21 @@ class AdminSessionStore:
                 (int(time.time()) - ttl_seconds,),
             )
             db.execute(
-                "INSERT INTO admin_sessions (sid, username, issued_at, pwd_fp) VALUES (?, ?, ?, ?)",
-                (sid, normalize_username(username), issued_at, pwd_fp),
+                "INSERT INTO admin_sessions (sid, username, issued_at, pwd_fp, last_seen) VALUES (?, ?, ?, ?, ?)",
+                (sid, normalize_username(username), issued_at, pwd_fp, issued_at),
             )
 
-    def get(self, sid: str) -> tuple[str, str] | None:
-        """(아이디, 비밀번호 지문)을 돌려줍니다. 없는 세션이면 None입니다."""
+    def touch(self, sid: str, now: int) -> None:
+        with self._connect() as db:
+            db.execute("UPDATE admin_sessions SET last_seen = ? WHERE sid = ?", (now, sid))
+
+    def get(self, sid: str) -> tuple[str, str, int] | None:
+        """(아이디, 비밀번호 지문, 마지막 사용 시각)을 돌려줍니다. 없는 세션이면 None입니다."""
         with self._connect() as db:
             row = db.execute(
-                "SELECT username, pwd_fp FROM admin_sessions WHERE sid = ?", (sid,)
+                "SELECT username, pwd_fp, last_seen FROM admin_sessions WHERE sid = ?", (sid,)
             ).fetchone()
-        return (row[0], row[1]) if row else None
+        return (row[0], row[1], row[2]) if row else None
 
     def set_fingerprint(self, sid: str, pwd_fp: str) -> None:
         with self._connect() as db:

@@ -3,6 +3,7 @@ import { API_BASE_URL } from './apiConfig'
 // 로그인 자체와 세션 확인 API는 401이 정상 응답이므로 로그인 창을 띄우지 않습니다.
 const AUTH_ENDPOINTS = ['/admin/login', '/admin/session', '/admin/logout']
 export const LOGIN_REQUIRED_EVENT = 'gimhae:login-required'
+export const SESSION_CHANGED_EVENT = 'gimhae:session-changed'
 
 export function isAuthEndpoint(url: string): boolean {
   return AUTH_ENDPOINTS.some((path) => url.includes(API_BASE_URL + path))
@@ -30,8 +31,9 @@ let resolvePendingLogin: ((loggedIn: boolean) => void) | null = null
 export const LOGIN_PROMPT_COOLDOWN_MS = 3000
 let suppressedUntil = 0
 
-export function requestLogin(): Promise<boolean> {
-  if (Date.now() < suppressedUntil) return Promise.resolve(false)
+export function requestLogin(userInitiated = false): Promise<boolean> {
+  // 사용자가 직접 로그인 버튼을 누른 경우에는 대기 시간과 상관없이 엽니다.
+  if (!userInitiated && Date.now() < suppressedUntil) return Promise.resolve(false)
   if (!pendingLogin) {
     pendingLogin = new Promise<boolean>((resolve) => {
       resolvePendingLogin = resolve
@@ -44,6 +46,7 @@ export function requestLogin(): Promise<boolean> {
 // 로그인 창이 성공하면 true, 닫으면 false로 끝냅니다.
 export function finishLogin(loggedIn: boolean): void {
   if (!loggedIn) suppressedUntil = Date.now() + LOGIN_PROMPT_COOLDOWN_MS
+  else window.dispatchEvent(new CustomEvent(SESSION_CHANGED_EVENT))
   resolvePendingLogin?.(loggedIn)
   resolvePendingLogin = null
   pendingLogin = null
@@ -77,7 +80,7 @@ export function installLoginRetry(): void {
   const originalFetch = window.fetch.bind(window)
   window.fetch = createLoginRetryFetch(
     originalFetch,
-    requestLogin,
+    () => requestLogin(),
     () => window.location.pathname,
   )
 }

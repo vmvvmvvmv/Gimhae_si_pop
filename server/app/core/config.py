@@ -52,6 +52,10 @@ try:
     )
 except ValueError:
     ADMIN_SESSION_TTL_SECONDS = 28800
+try:
+    ADMIN_SESSION_IDLE_SECONDS = int(os.getenv("ADMIN_SESSION_IDLE_SECONDS", "1800"))
+except ValueError:
+    ADMIN_SESSION_IDLE_SECONDS = 1800
 ADMIN_COOKIE_SECURE = _parse_bool(
     os.getenv("ADMIN_COOKIE_SECURE"),
     default=False,

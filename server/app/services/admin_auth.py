@@ -9,6 +9,7 @@ from fastapi import HTTPException, Request, status
 
 from ..core.config import (
     ADMIN_PASSWORD_HASH,
+    ADMIN_SESSION_IDLE_SECONDS,
     ADMIN_SESSION_SECRET,
     ADMIN_SESSION_TTL_SECONDS,
     ADMIN_USERNAME,
@@ -175,6 +176,10 @@ def read_session(value: str | None, now: int | None = None) -> AdminSession | No
     stored = SESSION_STORE.get(sid)
     if stored is None or normalize_username(stored[0]) != normalize_username(username):
         return None
+    last_seen = stored[2] or issued_at
+    if current_time - last_seen >= ADMIN_SESSION_IDLE_SECONDS:
+        SESSION_STORE.revoke(sid)
+        return None
     # 역할과 활성 여부는 요청마다 계정 기록에서 다시 읽어서, 변경이 바로 반영되게 합니다.
     account = ACCOUNT_STORE.get(username)
     if account is None or not account.is_active:
@@ -182,6 +187,9 @@ def read_session(value: str | None, now: int | None = None) -> AdminSession | No
     # 비밀번호가 바뀌었으면 발급 당시의 지문과 달라져서 옛 세션은 거부됩니다.
     if not hmac.compare_digest(stored[1], password_fingerprint(account.password_hash)):
         return None
+    # 요청마다 쓰지 않도록 1분에 한 번만 사용 시각을 갱신합니다.
+    if current_time - last_seen >= 60:
+        SESSION_STORE.touch(sid, current_time)
     return AdminSession(username=account.username, role=account.role, issued_at=issued_at)
 
 

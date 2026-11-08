@@ -337,6 +337,8 @@ function AccountsPanel({ currentUsername }: { currentUsername: string }) {
   const [newUsername, setNewUsername] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [newRole, setNewRole] = useState<'admin' | 'user'>('user')
+  const [resetTarget, setResetTarget] = useState<string | null>(null)
+  const [resetValue, setResetValue] = useState('')
 
   const load = async () => {
     const response = await fetch(`${API_BASE_URL}/admin/users`, { credentials: 'include' })
@@ -400,18 +402,21 @@ function AccountsPanel({ currentUsername }: { currentUsername: string }) {
     ), '계정을 삭제하지 못했습니다.')
   }
 
-  const resetPassword = (account: Account) => {
-    const password = window.prompt(`${account.username}의 새 비밀번호(10자 이상)를 입력하세요.`)
-    if (!password) return
-    void run(() => fetch(
-      `${API_BASE_URL}/admin/users/${encodeURIComponent(account.username)}`,
+  const submitPasswordReset = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!resetTarget) return
+    const username = resetTarget
+    await run(() => fetch(
+      `${API_BASE_URL}/admin/users/${encodeURIComponent(username)}`,
       {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password: resetValue }),
       },
     ), '비밀번호를 바꾸지 못했습니다.')
+    setResetValue('')
+    setResetTarget(null)
   }
 
   return (
@@ -437,6 +442,16 @@ function AccountsPanel({ currentUsername }: { currentUsername: string }) {
         </label>
         <button type="submit">계정 만들기</button>
       </form>
+      {resetTarget && (
+        <form onSubmit={(event) => void submitPasswordReset(event)}>
+          <label>
+            {resetTarget}의 새 비밀번호(10자 이상)
+            <input type="password" value={resetValue} onChange={(event) => setResetValue(event.target.value)} minLength={10} autoComplete="new-password" required autoFocus />
+          </label>
+          <button type="submit">변경</button>
+          <button type="button" onClick={() => { setResetValue(''); setResetTarget(null) }}>취소</button>
+        </form>
+      )}
       <p>
         전체 {accounts.length}명 · 사용 중 {accounts.filter((a) => a.isActive).length}명 · 관리자 {accounts.filter((a) => a.role === 'admin').length}명
       </p>
@@ -457,7 +472,7 @@ function AccountsPanel({ currentUsername }: { currentUsername: string }) {
                   <button type="button" onClick={() => void toggleActive(account)}>
                     {account.isActive ? '비활성화' : '활성화'}
                   </button>{' '}
-                  <button type="button" onClick={() => resetPassword(account)}>비밀번호 재설정</button>{' '}
+                  <button type="button" onClick={() => { setResetValue(''); setResetTarget(account.username) }}>비밀번호 재설정</button>{' '}
                   <button
                     type="button"
                     onClick={() => void deleteAccount(account)}

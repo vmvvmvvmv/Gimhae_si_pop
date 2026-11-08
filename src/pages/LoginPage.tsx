@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { API_BASE_URL } from '../lib/apiConfig'
+import './AuthPages.css'
 import { safeNextPath } from '../lib/authRedirect'
 
 export default function LoginPage() {
@@ -39,8 +40,8 @@ export default function LoginPage() {
   }
 
   return (
-    <main>
-      <h1>관리자 로그인</h1>
+    <main className="auth-page">
+      <h1>로그인</h1>
       <form onSubmit={submit}>
         <label>
           아이디
