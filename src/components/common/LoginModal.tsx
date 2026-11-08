@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { API_BASE_URL } from '../../lib/apiConfig'
+import { postJson } from '../../lib/postJson'
 import { LOGIN_REQUIRED_EVENT, finishLogin } from '../../lib/authRedirect'
 import './LoginModal.css'
 
@@ -13,25 +13,6 @@ const TITLES: Record<Mode, string> = {
   'reset-confirm': '재설정 코드 입력',
 }
 
-// POST 요청을 보내고, 실패하면 서버가 준 메시지로 오류를 던집니다.
-async function postJson(path: string, body: unknown): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (response.ok) return
-  const data = await response.json().catch(() => ({})) as { detail?: string }
-  if (response.status === 429) {
-    const seconds = Number(response.headers.get('Retry-After'))
-    throw new Error(Number.isFinite(seconds) && seconds > 0
-      ? `요청이 많습니다. ${seconds}초 후 다시 시도해 주세요.`
-      : data.detail || '잠시 후 다시 시도해 주세요.')
-  }
-  throw new Error(data.detail || '요청을 처리하지 못했습니다.')
-}
-
 // 기능을 쓰는 중에 로그인이 필요해지면, 페이지를 떠나지 않고 이 창에서 처리합니다.
 // 다른 모달(예: 내보내기 창)이 이미 열려 있어도 맨 위에 보이도록 네이티브 <dialog>를 씁니다.
 export default function LoginModal() {
@@ -41,6 +22,7 @@ export default function LoginModal() {
   const [mode, setMode] = useState<Mode>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [remember, setRemember] = useState(false)
   const [confirmPassword, setConfirmPassword] = useState('')
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
@@ -105,7 +87,7 @@ export default function LoginModal() {
   const submitLogin = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     void run(async () => {
-      await postJson('/admin/login', { username, password })
+      await postJson('/admin/login', { username, password, remember })
       // 로그인이 성공해야 막혀 있던 요청을 다시 보냅니다.
       close(true)
     }, '로그인에 실패했습니다.')
@@ -193,6 +175,10 @@ export default function LoginModal() {
                   autoComplete="current-password"
                   required
                 />
+              </label>
+              <label className="login-modal-remember">
+                <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+                로그인 유지
               </label>
               {notice && <p role="status" className="login-modal-notice">{notice}</p>}
               {error && <p role="alert" className="login-modal-error">{error}</p>}

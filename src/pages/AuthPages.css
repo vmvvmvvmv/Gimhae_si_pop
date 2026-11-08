@@ -59,6 +59,19 @@
   font-size: 14px;
 }
 
+.auth-page label.auth-remember {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+.auth-remember input {
+  width: auto;
+  padding: 0;
+  accent-color: #236bb5;
+}
+
 .auth-page button {
   padding: 10px 14px;
   border: 1px solid #b8cfe5;

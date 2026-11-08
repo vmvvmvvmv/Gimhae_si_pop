@@ -196,6 +196,7 @@ const AUDIT_LABELS: Record<string, string> = {
   reset_reject: '재설정 거절',
   password_reset_completed: '비밀번호 재설정 완료',
   password_changed: '비밀번호 변경',
+  username_changed: '아이디 변경',
   sync_start: '동기화 시작',
   admin_recovery: '서버 명령으로 관리자 복구',
 }

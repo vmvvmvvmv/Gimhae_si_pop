@@ -36,6 +36,8 @@ class AdminSessionStore:
                 db.execute("ALTER TABLE admin_sessions ADD COLUMN pwd_fp TEXT NOT NULL DEFAULT ''")
             if "last_seen" not in columns:
                 db.execute("ALTER TABLE admin_sessions ADD COLUMN last_seen INTEGER NOT NULL DEFAULT 0")
+            if "remember" not in columns:
+                db.execute("ALTER TABLE admin_sessions ADD COLUMN remember INTEGER NOT NULL DEFAULT 0")
             # 대문자로 저장된 예전 세션도 계정별 로그아웃 대상이 되게 맞춥니다.
             db.execute("UPDATE admin_sessions SET username = lower(username) WHERE username <> lower(username)")
 
@@ -49,29 +51,29 @@ class AdminSessionStore:
             db.close()
 
     def create(self, sid: str, username: str, issued_at: int, ttl_seconds: int,
-               pwd_fp: str = "") -> None:
+               pwd_fp: str = "", remember: bool = False, remember_ttl_seconds: int = 0) -> None:
         # 만료된 세션 기록은 새 세션을 만들 때 함께 지웁니다.
         with self._connect() as db:
             db.execute(
-                "DELETE FROM admin_sessions WHERE issued_at < ?",
-                (int(time.time()) - ttl_seconds,),
+                "DELETE FROM admin_sessions WHERE (remember = 0 AND issued_at < ?) OR (remember = 1 AND issued_at < ?)",
+                (int(time.time()) - ttl_seconds, int(time.time()) - max(ttl_seconds, remember_ttl_seconds)),
             )
             db.execute(
-                "INSERT INTO admin_sessions (sid, username, issued_at, pwd_fp, last_seen) VALUES (?, ?, ?, ?, ?)",
-                (sid, normalize_username(username), issued_at, pwd_fp, issued_at),
+                "INSERT INTO admin_sessions (sid, username, issued_at, pwd_fp, last_seen, remember) VALUES (?, ?, ?, ?, ?, ?)",
+                (sid, normalize_username(username), issued_at, pwd_fp, issued_at, int(remember)),
             )
 
     def touch(self, sid: str, now: int) -> None:
         with self._connect() as db:
             db.execute("UPDATE admin_sessions SET last_seen = ? WHERE sid = ?", (now, sid))
 
-    def get(self, sid: str) -> tuple[str, str, int] | None:
-        """(아이디, 비밀번호 지문, 마지막 사용 시각)을 돌려줍니다. 없는 세션이면 None입니다."""
+    def get(self, sid: str) -> tuple[str, str, int, bool] | None:
+        """(아이디, 비밀번호 지문, 마지막 사용 시각, 로그인 유지 여부)를 돌려줍니다. 없는 세션이면 None입니다."""
         with self._connect() as db:
             row = db.execute(
-                "SELECT username, pwd_fp, last_seen FROM admin_sessions WHERE sid = ?", (sid,)
+                "SELECT username, pwd_fp, last_seen, remember FROM admin_sessions WHERE sid = ?", (sid,)
             ).fetchone()
-        return (row[0], row[1], row[2]) if row else None
+        return (row[0], row[1], row[2], bool(row[3])) if row else None
 
     def set_fingerprint(self, sid: str, pwd_fp: str) -> None:
         with self._connect() as db:

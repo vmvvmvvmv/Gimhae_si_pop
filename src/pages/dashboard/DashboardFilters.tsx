@@ -39,6 +39,7 @@ export function PeriodFilters({
   months,
   month,
   loading,
+  locked = false,
   isPartialMonth,
   onYearChange,
   onMonthChange,
@@ -48,6 +49,7 @@ export function PeriodFilters({
   months: number[]
   month: number
   loading: boolean
+  locked?: boolean
   isPartialMonth: (month: number) => boolean
   onYearChange: (year: number) => void
   onMonthChange: (month: number) => void
@@ -61,6 +63,7 @@ export function PeriodFilters({
           onChange={(event) => onYearChange(Number(event.target.value))}
           disabled={loading || !years.length}
         >
+          {locked && <option value={year}>로그인 후 선택</option>}
           {years.map((optionYear) => (
             <option key={optionYear} value={optionYear}>
               {optionYear}년
@@ -76,6 +79,7 @@ export function PeriodFilters({
           onChange={(event) => onMonthChange(Number(event.target.value))}
           disabled={loading || !months.length}
         >
+          {locked && <option value={month}>로그인 후 선택</option>}
           {months.map((optionMonth) => (
             <option key={optionMonth} value={optionMonth}>
               {optionMonth}월{isPartialMonth(optionMonth) ? ' (일부)' : ''}

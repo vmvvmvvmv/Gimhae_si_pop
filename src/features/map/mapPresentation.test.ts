@@ -10,7 +10,6 @@ describe('지도 표시 상태', () => {
     const style = getBoundaryVisualStyle({
       population: 20_000,
       maximumPopulation: 40_000,
-      showBoundaryFill: true,
       showDevelopmentAreas: false,
       isSelected: true,
     })
@@ -26,14 +25,12 @@ describe('지도 표시 상태', () => {
     const normal = getBoundaryVisualStyle({
       population: 20_000,
       maximumPopulation: 40_000,
-      showBoundaryFill: true,
       showDevelopmentAreas: false,
       isSelected: false,
     })
     const overlapped = getBoundaryVisualStyle({
       population: 20_000,
       maximumPopulation: 40_000,
-      showBoundaryFill: true,
       showDevelopmentAreas: true,
       isSelected: false,
     })
@@ -44,11 +41,19 @@ describe('지도 표시 상태', () => {
     )
   })
 
+  it('인구 값이 없으면 모든 지역을 같은 연한 색으로 칠한다', () => {
+    const style = getBoundaryVisualStyle({
+      maximumPopulation: 0,
+      showDevelopmentAreas: false,
+      isSelected: false,
+    })
+    expect(style).toMatchObject({ fillColor: '#c8dcf2', fillOpacity: 0.45 })
+  })
+
   it('두 동 비교에서는 두 번째 동을 다른 경계색으로 표시한다', () => {
     const style = getBoundaryVisualStyle({
       population: 20_000,
       maximumPopulation: 40_000,
-      showBoundaryFill: true,
       showDevelopmentAreas: false,
       isSelected: false,
       isCompared: true,

@@ -6,10 +6,9 @@ import DashboardPage from '../pages/DashboardPage'
 const LoginPage = lazy(() => import('../pages/LoginPage'))
 const SignupPage = lazy(() => import('../pages/SignupPage'))
 const PasswordResetPage = lazy(() => import('../pages/PasswordResetPage'))
-const AccountPage = lazy(() => import('../pages/AccountPage'))
 const AdminPage = lazy(() => import('../pages/AdminPage'))
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'))
-// 목업과 보고서 도구는 개발할 때만 보입니다. 운영 빌드에서는 NotFound로 처리됩니다.
+// 목업은 개발할 때만 보입니다. 운영 빌드에서는 NotFound로 처리됩니다.
 const SHOW_DEV_PAGES = import.meta.env.DEV
 const MapServiceMockupPage = lazy(() => import('../pages/MapServiceMockupPage'))
 const ReportFiguresPage = lazy(() => import('../pages/ReportFiguresPage'))
@@ -25,9 +24,8 @@ export function AppRouter() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/password-reset" element={<PasswordResetPage />} />
-          <Route path="/account" element={<AccountPage />} />
           <Route path="/admin" element={<AdminPage />} />
-          {SHOW_DEV_PAGES && <Route path="/report-figures" element={<ReportFiguresPage />} />}
+          <Route path="/report-figures" element={<ReportFiguresPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>

@@ -64,6 +64,9 @@ app.add_middleware(
 @app.middleware("http")
 async def add_security_headers(request, call_next):
     response = await call_next(request)
+    # 로그인해야 볼 수 있는 응답이 브라우저나 중간 캐시에 남지 않게 합니다.
+    if request.url.path.startswith("/api/"):
+        response.headers.setdefault("Cache-Control", "no-store")
     return apply_security_headers(response)
 
 app.include_router(population_router)

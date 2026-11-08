@@ -1,39 +1,126 @@
 .account-menu {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
   margin-left: auto;
-  color: #405a72;
   font: 700 12px Pretendard, 'Noto Sans KR', sans-serif;
 }
 
 .account-menu-name {
+  display: flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 2px;
+  border: 0;
   color: #183b60;
-}
-
-.account-menu a {
-  color: #236bb5;
-}
-
-.account-menu button {
-  border: 1px solid #b9cfe3;
-  border-radius: 9px;
-  padding: 7px 10px;
-  color: #22599a;
-  background: #f3f8fd;
+  background: none;
   font: inherit;
-  white-space: nowrap;
   cursor: pointer;
 }
 
-.account-menu button:hover {
-  background: #e5f1fd;
+.account-menu-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-menu-name::after {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  margin-bottom: 2px;
+  border-right: 1.5px solid currentcolor;
+  border-bottom: 1.5px solid currentcolor;
+  content: '';
+  transform: rotate(45deg);
+}
+
+.account-menu-name:hover {
+  color: #236bb5;
+}
+
+/* 브라우저 기본 popover: 바깥을 누르거나 Esc를 누르면 닫힙니다. 좁은 화면에서는 기본값대로 화면 가운데 뜹니다. */
+.account-menu-popover {
+  min-width: 120px;
+  border: 1px solid #d5e2ee;
+  border-radius: 6px;
+  padding: 4px;
+  background: #fff;
+  box-shadow: 0 6px 18px rgb(24 59 96 / 16%);
+}
+
+.account-menu-popover:popover-open {
+  display: grid;
+}
+
+.account-menu-popover a,
+.account-menu-popover button {
+  border: 0;
+  border-radius: 4px;
+  padding: 8px 10px;
+  color: #183b60;
+  background: none;
+  font: 600 13px Pretendard, 'Noto Sans KR', sans-serif;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.account-menu-popover a:hover,
+.account-menu-popover button:hover {
+  background: #eef4fa;
 }
 
 .account-menu a:focus-visible,
 .account-menu button:focus-visible {
   outline: 2px solid #236bb5;
   outline-offset: 2px;
+}
+
+.account-menu .login-modal {
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.account-menu .login-modal-body {
+  min-height: 0;
+}
+
+/* 넓은 화면은 왼쪽 메뉴의 사용 안내 위에, 왼쪽 메뉴가 없는 좁은 화면은 조회 조건 영역에 표시합니다. */
+@media (min-width: 821px) {
+  .filter-card > .account-menu {
+    display: none;
+  }
+
+  .dashboard-service-rail .account-menu {
+    width: calc(100% - 10px);
+    justify-content: center;
+    margin: auto 0 0;
+    font-size: 11px;
+  }
+
+  .dashboard-service-rail .account-menu + .dashboard-guide-rail {
+    margin-top: 8px;
+  }
+
+  @supports (anchor-name: --account) {
+    .dashboard-service-rail .account-menu-name {
+      anchor-name: --account;
+    }
+
+    .dashboard-service-rail .account-menu-popover {
+      position-anchor: --account;
+      inset: auto;
+      bottom: anchor(bottom);
+      left: anchor(right);
+      margin: 0 0 0 14px;
+    }
+  }
+}
+
+@media (max-width: 820px) {
+  .dashboard-service-rail .account-menu {
+    display: none;
+  }
 }

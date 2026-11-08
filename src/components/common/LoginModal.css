@@ -87,6 +87,19 @@
   outline-offset: 2px;
 }
 
+.login-modal label.login-modal-remember {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+.login-modal-remember input {
+  width: auto;
+  padding: 0;
+  accent-color: #236bb5;
+}
+
 .login-modal-error {
   margin: 0;
   color: #b42318;

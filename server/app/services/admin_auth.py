@@ -5,11 +5,13 @@ import secrets
 import time
 from dataclasses import dataclass
 
-from fastapi import HTTPException, Request, status
+from fastapi import HTTPException, Request, Response, status
 
 from ..core.config import (
     ADMIN_PASSWORD_HASH,
+    ADMIN_COOKIE_SECURE,
     ADMIN_SESSION_IDLE_SECONDS,
+    ADMIN_SESSION_REMEMBER_SECONDS,
     ADMIN_SESSION_SECRET,
     ADMIN_SESSION_TTL_SECONDS,
     ADMIN_USERNAME,
@@ -119,7 +121,7 @@ def require_admin(request: Request) -> AdminSession:
 
 
 def issue_session(username: str, issued_at: int | None = None,
-                  pwd_fp: str | None = None) -> str:
+                  pwd_fp: str | None = None, remember: bool = False) -> str:
     # 입력한 대소문자 그대로 세션에 넣으면 본인 확인 비교가 어긋나므로 저장 형태로 맞춥니다.
     username = normalize_username(username)
     timestamp = issued_at or int(time.time())
@@ -129,7 +131,10 @@ def issue_session(username: str, issued_at: int | None = None,
             raise ValueError("계정이 없어 세션을 만들 수 없습니다.")
         pwd_fp = password_fingerprint(account.password_hash)
     sid = secrets.token_urlsafe(16)
-    SESSION_STORE.create(sid, username, timestamp, ADMIN_SESSION_TTL_SECONDS, pwd_fp)
+    SESSION_STORE.create(
+        sid, username, timestamp, ADMIN_SESSION_TTL_SECONDS, pwd_fp,
+        remember, ADMIN_SESSION_REMEMBER_SECONDS,
+    )
     payload = f"{username}|{timestamp}|{sid}".encode("utf-8")
     signature = hmac.new(
         ADMIN_SESSION_SECRET.encode("utf-8"),
@@ -170,14 +175,16 @@ def read_session(value: str | None, now: int | None = None) -> AdminSession | No
     current_time = now or int(time.time())
     if issued_at > current_time:
         return None
-    if current_time - issued_at >= ADMIN_SESSION_TTL_SECONDS:
-        return None
     # 로그아웃·비활성화로 지워진 세션은 거부합니다.
     stored = SESSION_STORE.get(sid)
     if stored is None or normalize_username(stored[0]) != normalize_username(username):
         return None
+    remember = stored[3]
+    if current_time - issued_at >= (ADMIN_SESSION_REMEMBER_SECONDS if remember else ADMIN_SESSION_TTL_SECONDS):
+        return None
     last_seen = stored[2] or issued_at
-    if current_time - last_seen >= ADMIN_SESSION_IDLE_SECONDS:
+    # 로그인 유지를 고른 세션에는 미사용 자동 로그아웃을 적용하지 않습니다.
+    if not remember and current_time - last_seen >= ADMIN_SESSION_IDLE_SECONDS:
         SESSION_STORE.revoke(sid)
         return None
     # 역할과 활성 여부는 요청마다 계정 기록에서 다시 읽어서, 변경이 바로 반영되게 합니다.
@@ -191,6 +198,19 @@ def read_session(value: str | None, now: int | None = None) -> AdminSession | No
     if current_time - last_seen >= 60:
         SESSION_STORE.touch(sid, current_time)
     return AdminSession(username=account.username, role=account.role, issued_at=issued_at)
+
+
+def set_session_cookie(response: Response, value: str, remember: bool) -> None:
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        value,
+        # 로그인 유지를 고르지 않으면 만료를 지정하지 않아 브라우저를 닫을 때 쿠키가 사라집니다.
+        max_age=ADMIN_SESSION_REMEMBER_SECONDS if remember else None,
+        httponly=True,
+        secure=ADMIN_COOKIE_SECURE,
+        samesite="strict",
+        path="/",
+    )
 
 
 def session_id(value: str | None) -> str | None:

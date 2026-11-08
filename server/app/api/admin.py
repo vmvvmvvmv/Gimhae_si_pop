@@ -6,7 +6,7 @@ import sqlite3
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
 
-from ..core.config import ADMIN_COOKIE_SECURE, ADMIN_SESSION_SECRET, ADMIN_SESSION_TTL_SECONDS
+from ..core.config import ADMIN_SESSION_SECRET
 from ..services.account_store import LastAdminError, normalize_username
 from ..services import audit_log
 from ..services.account_requests import RESET, SIGNUP
@@ -48,6 +48,7 @@ def _audit(request: Request, admin: AdminSession, action: str, target: str | Non
 class LoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=100)
     password: str = Field(min_length=1, max_length=200)
+    remember: bool = False
 
 
 class PopulationSyncRequest(BaseModel):
@@ -90,19 +91,19 @@ def admin_login(payload: LoginRequest, response: Response, request: Request) -> 
         )
     login_limiter.clear(client_key)
     login_limiter.clear(account_key)
-    audit_log.record(login_name, "login_success", ip=client_ip)
+    audit_log.record(login_name, "login_success", "로그인 유지" if payload.remember else None, client_ip)
 
-    from ..services.admin_auth import issue_session, password_fingerprint
+    from ..services.admin_auth import issue_session, password_fingerprint, set_session_cookie
 
     # 검증에 쓴 해시의 지문을 그대로 넘깁니다. 검증 뒤에 비밀번호가 바뀌었다면 이 세션은 바로 무효입니다.
-    response.set_cookie(
-        SESSION_COOKIE_NAME,
-        issue_session(payload.username, pwd_fp=password_fingerprint(account.password_hash)),
-        max_age=ADMIN_SESSION_TTL_SECONDS,
-        httponly=True,
-        secure=ADMIN_COOKIE_SECURE,
-        samesite="strict",
-        path="/",
+    set_session_cookie(
+        response,
+        issue_session(
+            payload.username,
+            pwd_fp=password_fingerprint(account.password_hash),
+            remember=payload.remember,
+        ),
+        payload.remember,
     )
     return {"status": "ok"}
 

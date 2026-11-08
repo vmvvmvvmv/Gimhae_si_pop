@@ -229,11 +229,13 @@ function createBoundaryOutlines(
   }
 }
 
+// 색상 필터를 끄거나 도로 혼잡도를 켜면 인구 값 없이 그려서 모든 지역을 같은 연한 색으로 표시합니다.
+const NO_POPULATION_COLORS: AdminPopulationRegion[] = []
+
 function applyPopulationStyles(
   dataLayer: NaverMapData,
   boundaryType: BoundaryType,
   populationItems: AdminPopulationRegion[],
-  showBoundaryFill: boolean,
   showWaterways: boolean,
   showDevelopmentAreas: boolean,
   visibleDevelopmentAreaIds: ReadonlySet<string> | undefined,
@@ -323,7 +325,6 @@ function applyPopulationStyles(
     return getBoundaryVisualStyle({
       population,
       maximumPopulation,
-      showBoundaryFill,
       showDevelopmentAreas,
       isSelected,
       isCompared,
@@ -440,7 +441,9 @@ export default function NaverMap({
   const populationByCodeRef = useRef(getDistributionValues(populationItems))
   const developmentAreasRef = useRef(developmentAreas)
   const visibleDevelopmentAreaIdsRef = useRef(visibleDevelopmentAreaIds)
-  const showBoundaryFillRef = useRef(showBoundaryFill)
+  const styledPopulationItemsRef = useRef(
+    showBoundaryFill && !showRoadTraffic ? populationItems : NO_POPULATION_COLORS,
+  )
   const showWaterwaysRef = useRef(showWaterways)
   const showDevelopmentAreasRef = useRef(showDevelopmentAreas)
   const showMajorRoadsRef = useRef(showMajorRoads)
@@ -551,8 +554,8 @@ export default function NaverMap({
   useEffect(() => {
     populationItemsRef.current = populationItems
     populationByCodeRef.current = getDistributionValues(populationItems)
-    // 교통 정보는 지도 타일 레이어이므로 인구 면 채우기를 잠시 숨겨 가리지 않게 합니다.
-    showBoundaryFillRef.current = showBoundaryFill && !showRoadTraffic
+    const styledPopulationItems = showBoundaryFill && !showRoadTraffic ? populationItems : NO_POPULATION_COLORS
+    styledPopulationItemsRef.current = styledPopulationItems
     showWaterwaysRef.current = showWaterways
     showDevelopmentAreasRef.current = showDevelopmentAreas
     showMajorRoadsRef.current = showMajorRoads
@@ -562,8 +565,7 @@ export default function NaverMap({
       applyPopulationStyles(
         dataLayerRef.current,
         boundaryType,
-        populationItems,
-        showBoundaryFill && !showRoadTraffic,
+        styledPopulationItems,
         showWaterways,
         showDevelopmentAreas,
         visibleDevelopmentAreaIds,
@@ -627,7 +629,7 @@ export default function NaverMap({
             '<div class="facility-marker ' + markerMeta.className + '"></div>' +
             '<small class="facility-marker-label">' + markerMeta.label + '</small>' +
             '</div>',
-          anchor: new maps.Point(20, 10),
+          anchor: new maps.Point(20, 9),
         },
       })
 
@@ -835,8 +837,7 @@ export default function NaverMap({
         applyPopulationStyles(
           dataLayer,
           boundaryType,
-          populationItemsRef.current,
-          showBoundaryFillRef.current,
+          styledPopulationItemsRef.current,
           showWaterwaysRef.current,
           showDevelopmentAreasRef.current,
           visibleDevelopmentAreaIdsRef.current,
@@ -1018,7 +1019,7 @@ export default function NaverMap({
 
           dataLayer.overrideStyle(event.feature, {
             fillColor: '#0f4f93',
-            fillOpacity: showBoundaryFillRef.current ? 0.9 : 0,
+            fillOpacity: 0.9,
             strokeColor: '#0f4f93',
             strokeWeight: 3,
           })

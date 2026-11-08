@@ -7,6 +7,7 @@ import { safeNextPath } from '../lib/authRedirect'
 export default function LoginPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [remember, setRemember] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -19,7 +20,7 @@ export default function LoginPage() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, remember }),
       })
       if (!response.ok) {
         const body = await response.json().catch(() => ({})) as { detail?: string }
@@ -50,6 +51,10 @@ export default function LoginPage() {
         <label>
           비밀번호
           <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required />
+        </label>
+        <label className="auth-remember">
+          <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+          로그인 유지
         </label>
         <button type="submit" disabled={loading}>{loading ? '로그인 중…' : '로그인'}</button>
         {error && <p role="alert">{error}</p>}

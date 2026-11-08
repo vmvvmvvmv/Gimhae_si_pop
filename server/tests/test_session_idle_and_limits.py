@@ -1,4 +1,5 @@
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -45,6 +46,50 @@ class IdleSessionTests(unittest.TestCase):
         value = issue_session("kim", issued_at=1000)
         for now in (1500, 2000, 2500, 3000):
             self.assertIsNotNone(read_session(value, now=now))
+
+
+class RememberSessionTests(IdleSessionTests):
+    def test_remembered_session_survives_idle_and_normal_lifetime(self):
+        with patch("app.services.admin_auth.ADMIN_SESSION_REMEMBER_SECONDS", 100_000):
+            value = issue_session("kim", issued_at=1000, remember=True)
+            self.assertIsNotNone(read_session(value, now=1000 + 50_000))
+            self.assertIsNone(read_session(value, now=1000 + 100_000))
+
+    def test_normal_session_does_not_get_the_long_lifetime(self):
+        with patch("app.services.admin_auth.ADMIN_SESSION_REMEMBER_SECONDS", 100_000):
+            value = issue_session("kim", issued_at=1000)
+            self.assertIsNone(read_session(value, now=1000 + 50_000))
+
+    def test_remembered_session_is_still_revoked_by_password_change(self):
+        with patch("app.services.admin_auth.ADMIN_SESSION_REMEMBER_SECONDS", 100_000):
+            value = issue_session("kim", issued_at=1000, remember=True)
+            self.accounts.update("kim", password_hash=hash_password("another-password"))
+            self.assertIsNone(read_session(value, now=1100))
+
+    def test_cleanup_keeps_remembered_sessions(self):
+        now = int(time.time())
+        self.sessions.create("old-remember", "kim", now - 50_000, 10_000, "", True, 100_000)
+        self.sessions.create("old-normal", "kim", now - 50_000, 10_000, "", False, 100_000)
+        self.sessions.create("new", "kim", now, 10_000, "", False, 100_000)
+        self.assertIsNotNone(self.sessions.get("old-remember"))
+        self.assertIsNone(self.sessions.get("old-normal"))
+
+    def test_cookie_lifetime_follows_the_checkbox(self):
+        request = Request({"type": "http", "client": ("10.0.2.1", 1234), "headers": []})
+        cookies = {}
+        for remember in (False, True):
+            response = Response()
+            with tempfile.TemporaryDirectory() as directory:
+                limiter = LoginRateLimiter(Path(directory) / "attempts.db")
+                with patch("app.services.audit_log.AUDIT_STORE"), \
+                     patch("app.api.admin.login_limiter", limiter), \
+                     patch("app.api.admin.ADMIN_SESSION_SECRET", "secret"), \
+                     patch("app.api.admin.admin_auth_configured", return_value=True), \
+                     patch("app.api.admin.authenticate_account", return_value=self.accounts.get("kim")):
+                    admin_login(LoginRequest(username="kim", password="x", remember=remember), response, request)
+            cookies[remember] = response.headers["set-cookie"].lower()
+        self.assertNotIn("max-age", cookies[False])
+        self.assertIn("max-age", cookies[True])
 
 
 class AccountLoginLimitTests(unittest.TestCase):

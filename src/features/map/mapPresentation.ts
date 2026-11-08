@@ -11,7 +11,6 @@ export type MapControlPopover = 'development' | 'facility'
 interface BoundaryStyleOptions {
   population?: number
   maximumPopulation: number
-  showBoundaryFill: boolean
   showDevelopmentAreas: boolean
   isSelected: boolean
   isCompared?: boolean
@@ -20,7 +19,6 @@ interface BoundaryStyleOptions {
 export function getBoundaryVisualStyle({
   population,
   maximumPopulation,
-  showBoundaryFill,
   showDevelopmentAreas,
   isSelected,
   isCompared = false,
@@ -35,11 +33,9 @@ export function getBoundaryVisualStyle({
 
   return {
     fillColor: POPULATION_FILL_COLORS[colorIndex],
-    fillOpacity: showBoundaryFill
-      ? showDevelopmentAreas
-        ? (population ? 0.7 : 0.36)
-        : (population ? 0.86 : 0.45)
-      : 0,
+    fillOpacity: showDevelopmentAreas
+      ? (population ? 0.7 : 0.36)
+      : (population ? 0.86 : 0.45),
     strokeColor: isSelected ? '#f7c948' : isCompared ? '#19a79e' : '#174a8c',
     strokeOpacity: 1,
     strokeWeight: isSelected ? 5 : isCompared ? 4 : 1.4,

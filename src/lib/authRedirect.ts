@@ -1,12 +1,12 @@
 import { API_BASE_URL } from './apiConfig'
 
-// 로그인 자체와 세션 확인 API는 401이 정상 응답이므로 로그인 창을 띄우지 않습니다.
-const AUTH_ENDPOINTS = ['/admin/login', '/admin/session', '/admin/logout']
+// 로그인·세션 확인은 401이 정상 응답입니다. 조회 가능 기간은 첫 화면이 스스로 부르는 요청이라, 사용자가 누르지 않았는데 로그인 창이 뜨지 않게 합니다.
+const NO_PROMPT_ENDPOINTS = ['/admin/login', '/admin/session', '/admin/logout', '/population/availability']
 export const LOGIN_REQUIRED_EVENT = 'gimhae:login-required'
 export const SESSION_CHANGED_EVENT = 'gimhae:session-changed'
 
-export function isAuthEndpoint(url: string): boolean {
-  return AUTH_ENDPOINTS.some((path) => url.includes(API_BASE_URL + path))
+export function isNoPromptEndpoint(url: string): boolean {
+  return NO_PROMPT_ENDPOINTS.some((path) => url.includes(API_BASE_URL + path))
 }
 
 // 로그인 뒤 돌아갈 주소는 이 사이트 안의 경로만 허용합니다(열린 리다이렉트 방지).
@@ -66,7 +66,7 @@ export function createLoginRetryFetch(
     if (
       response.status !== 401 ||
       !url.includes(API_BASE_URL) ||
-      isAuthEndpoint(url) ||
+      isNoPromptEndpoint(url) ||
       currentPath().startsWith('/login')
     ) {
       return response

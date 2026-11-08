@@ -36,4 +36,21 @@
   padding: clamp(1.5rem, 4vw, 3rem) 0 4rem;
 }
 
+.report-figures-locked {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 72px 16px;
+  color: #183b60;
+  text-align: center;
+}
 
+.report-figures-locked button {
+  padding: 9px 22px;
+  border: 1px solid #236bb5;
+  border-radius: 9px;
+  color: #fff;
+  background: #236bb5;
+  font: 700 13px Pretendard, 'Noto Sans KR', sans-serif;
+  cursor: pointer;
+}
