@@ -56,3 +56,7 @@ server/app/models.py.bak
 *.njsproj
 *.sln
 *.sw?
+
+# Local development and deployment documents
+/docs/*
+!/docs/images/
