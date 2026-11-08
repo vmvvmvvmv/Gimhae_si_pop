@@ -12,6 +12,7 @@ import NaverMap, {
   type AddressSearchResult,
 } from '../components/map/NaverMap'
 import NaverRoadview from '../components/map/NaverRoadview'
+import MapErrorBoundary from '../components/map/MapErrorBoundary'
 import {
   getRegionCode,
   getRegionName,
@@ -1413,6 +1414,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          <MapErrorBoundary label="지도">
           <NaverMap
             boundaryType={boundaryType}
             selectedRegion={selectedRegion}
@@ -1448,6 +1450,7 @@ export default function DashboardPage() {
             showDevelopmentAreas={showDevelopmentAreas}
             developmentNotices={developmentNoticesQuery.data?.items}
           />
+          </MapErrorBoundary>
         </div>
 
         <aside className="detail-card" id="region-detail" aria-live="polite">
@@ -1565,6 +1568,7 @@ export default function DashboardPage() {
                 </span>
               </div>
               {selectedFacility && (
+                <MapErrorBoundary label="거리뷰" key={selectedFacility.id}>
                 <NaverRoadview
                   key={selectedFacility.id}
                   latitude={selectedFacility.latitude}
@@ -1572,6 +1576,7 @@ export default function DashboardPage() {
                   placeName={selectedFacility.name}
                   address={selectedFacility.roadAddress || selectedFacility.parcelAddress}
                 />
+                </MapErrorBoundary>
               )}
               {selectedFacility?.imageUrl && (
                 <figure className="selection-photo">

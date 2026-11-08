@@ -18,5 +18,18 @@ class SecurityHeaderTests(unittest.TestCase):
         self.assertIn("geolocation=()", response.headers["permissions-policy"])
 
 
+    def test_naver_map_style_scripts_are_allowed_without_opening_other_hosts(self):
+        response = Response()
+        apply_security_headers(response)
+        directives = dict(
+            part.strip().split(" ", 1)
+            for part in response.headers["content-security-policy"].split(";")
+        )
+        self.assertIn("*.map.naver.net", directives["script-src"])
+        self.assertIn("static.naver.net", directives["style-src"])
+        self.assertNotIn("unsafe-inline", directives["script-src"])
+        self.assertNotIn("*.naver.com", directives["script-src"])
+
+
 if __name__ == "__main__":
     unittest.main()
