@@ -24,7 +24,7 @@
 .filter-label,
 .section-title small {
   margin: 0;
-  color: #3b8c86;
+  color: #2b6f6a;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.14em;
@@ -50,7 +50,7 @@
   border: 0;
   border-bottom: 3px solid transparent;
   padding: 8px 2px 7px;
-  color: #71818a;
+  color: #5a6a73;
   background: transparent;
   font-size: 13px;
   font-weight: 700;
@@ -728,7 +728,7 @@
 
 .road-traffic-note {
   margin: 10px 1px 0;
-  color: #647986;
+  color: #536674;
   font-size: 10px;
   line-height: 1.4;
 }
@@ -1647,7 +1647,7 @@
 .legend-scale-wrap > div {
   display: flex;
   justify-content: space-between;
-  color: #6f818a;
+  color: #56676f;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -1765,7 +1765,7 @@ body[data-map-tour-active="true"] .map-tour-region path {
 }
 
 .major-road-map-note small {
-  color: #647986;
+  color: #536674;
   font-size: 9px;
 }
 
@@ -2693,7 +2693,7 @@ body[data-map-tour-active="true"] .map-tour-region path {
 
 .delta-meter-fill.positive {
   left: 50%;
-  background: #3b8c86;
+  background: #2b6f6a;
 }
 
 .delta-meter-fill.negative {
@@ -2969,7 +2969,7 @@ body[data-map-tour-active="true"] .map-tour-region path {
 
 .age-label,
 .age-value {
-  color: #647986;
+  color: #536674;
   font-size: 11px;
 }
 

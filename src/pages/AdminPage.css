@@ -1,0 +1,186 @@
+/* 관리자 페이지 전용 스타일입니다. 모든 규칙은 .admin-page 아래에만 적용됩니다. */
+.admin-page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 32px 20px 56px;
+  color: #233b52;
+  background: #f5f8fb;
+  font-family: Pretendard, 'Noto Sans KR', sans-serif;
+}
+
+.admin-page h1 {
+  margin: 0 0 18px;
+  color: #183b60;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.admin-page section,
+.admin-page > .admin-card {
+  margin-bottom: 18px;
+  padding: 20px 22px;
+  border: 1px solid #cedbe7;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 6px 18px rgb(19 46 78 / 6%);
+}
+
+.admin-page h2 {
+  margin: 0 0 10px;
+  color: #183b60;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.admin-page p {
+  margin: 0 0 12px;
+  color: #344b60;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.admin-page form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.admin-page label {
+  display: grid;
+  gap: 5px;
+  color: #405a72;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-page input,
+.admin-page select {
+  min-width: 160px;
+  padding: 9px 10px;
+  border: 1px solid #c5d6e6;
+  border-radius: 8px;
+  color: #263f57;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+}
+
+.admin-page button {
+  padding: 9px 14px;
+  border: 1px solid #b8cfe5;
+  border-radius: 9px;
+  color: #1f5c9c;
+  background: #f2f8fe;
+  font: 700 13px Pretendard, 'Noto Sans KR', sans-serif;
+  cursor: pointer;
+}
+
+.admin-page button:hover:not(:disabled) {
+  background: #e5f1fd;
+}
+
+.admin-page button[type='submit'] {
+  border-color: #236bb5;
+  color: #fff;
+  background: #236bb5;
+}
+
+.admin-page button[type='submit']:hover:not(:disabled) {
+  background: #1d5ca0;
+}
+
+.admin-page button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-page input:focus-visible,
+.admin-page select:focus-visible,
+.admin-page button:focus-visible,
+.admin-page a:focus-visible {
+  outline: 2px solid #236bb5;
+  outline-offset: 2px;
+}
+
+.admin-page a {
+  color: #236bb5;
+  font-weight: 700;
+}
+
+.admin-page [role='alert'] {
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-page [role='status'] {
+  color: #1f6b3a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-page table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.admin-page th {
+  padding: 9px 8px;
+  border-bottom: 1px solid #d5e2ee;
+  color: #405a72;
+  background: #f5f9fd;
+  text-align: left;
+  font-weight: 700;
+}
+
+.admin-page td {
+  padding: 9px 8px;
+  border-bottom: 1px solid #e5edf4;
+  color: #263f57;
+  vertical-align: middle;
+}
+
+.admin-page ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-page li {
+  padding: 10px 0;
+  border-bottom: 1px solid #e5edf4;
+  color: #263f57;
+  font-size: 13px;
+}
+
+.admin-page pre {
+  overflow-x: auto;
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: #344b60;
+  background: #f5f8fb;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 640px) {
+  .admin-page {
+    padding: 20px 14px 40px;
+  }
+
+  .admin-page input,
+  .admin-page select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .admin-page form label {
+    width: 100%;
+  }
+}

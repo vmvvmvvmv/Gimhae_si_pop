@@ -79,7 +79,9 @@ python -m venv .venv
 ```powershell
 npm run lint
 npm run build
-npm test
+npm run test:all
 ```
 
-백엔드 테스트는 `server` 디렉터리에서 `.venv\Scripts\python.exe -m unittest discover -s tests`로 실행합니다.
+- `npm run test`: 프런트엔드 테스트(Vitest)만 실행합니다.
+- `npm run test:server`: 백엔드 테스트(unittest)를 실행합니다. `server/.venv`가 있으면 그 Python을 쓰고, 없으면 시스템 `python`을 씁니다.
+- `npm run test:all`: 린트, 프런트 테스트, 백엔드 테스트를 차례로 실행합니다.

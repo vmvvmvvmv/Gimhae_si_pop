@@ -10,4 +10,18 @@ export default defineConfig({
       '/api': 'http://localhost:8000',
     },
   },
+  build: {
+    rolldownOptions: {
+      output: {
+        // 자주 바뀌지 않는 라이브러리를 따로 묶어서 앱 코드가 바뀌어도 캐시가 유지되게 합니다.
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return undefined
+          if (id.includes('proj4')) return 'geo'
+          if (id.includes('@tanstack') || id.includes('react-router')) return 'data'
+          if (id.includes('react')) return 'react'
+          return 'vendor'
+        },
+      },
+    },
+  },
 })

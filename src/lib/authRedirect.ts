@@ -1,7 +1,8 @@
 import { API_BASE_URL } from './apiConfig'
 
-// 로그인 자체와 세션 확인 API는 401이 정상 응답이므로 이동시키지 않습니다.
+// 로그인 자체와 세션 확인 API는 401이 정상 응답이므로 로그인 창을 띄우지 않습니다.
 const AUTH_ENDPOINTS = ['/admin/login', '/admin/session', '/admin/logout']
+export const LOGIN_REQUIRED_EVENT = 'gimhae:login-required'
 
 export function isAuthEndpoint(url: string): boolean {
   return AUTH_ENDPOINTS.some((path) => url.includes(API_BASE_URL + path))
@@ -20,20 +21,63 @@ export function loginUrlFor(currentPath: string): string {
   return `/login?next=${encodeURIComponent(currentPath)}`
 }
 
-// 로그인이 필요한 기능을 누르면 API가 401을 돌려줍니다. 이때만 로그인 화면으로 보냅니다.
-export function installLoginRedirect(): void {
-  const originalFetch = window.fetch.bind(window)
-  window.fetch = async (input, init) => {
-    const response = await originalFetch(input, init)
+// 로그인 창 요청은 한 번에 하나만 엽니다. 동시에 여러 요청이 401을 받아도 창은 하나입니다.
+let pendingLogin: Promise<boolean> | null = null
+let resolvePendingLogin: ((loggedIn: boolean) => void) | null = null
+
+// 사용자가 창을 닫은 직후에는 다시 띄우지 않습니다. React Query가 실패한 조회를 1초 뒤에 자동으로
+// 다시 요청하는데, 그때마다 창이 다시 뜨는 것을 막기 위함입니다.
+export const LOGIN_PROMPT_COOLDOWN_MS = 3000
+let suppressedUntil = 0
+
+export function requestLogin(): Promise<boolean> {
+  if (Date.now() < suppressedUntil) return Promise.resolve(false)
+  if (!pendingLogin) {
+    pendingLogin = new Promise<boolean>((resolve) => {
+      resolvePendingLogin = resolve
+      window.dispatchEvent(new CustomEvent(LOGIN_REQUIRED_EVENT))
+    })
+  }
+  return pendingLogin
+}
+
+// 로그인 창이 성공하면 true, 닫으면 false로 끝냅니다.
+export function finishLogin(loggedIn: boolean): void {
+  if (!loggedIn) suppressedUntil = Date.now() + LOGIN_PROMPT_COOLDOWN_MS
+  resolvePendingLogin?.(loggedIn)
+  resolvePendingLogin = null
+  pendingLogin = null
+}
+
+type FetchFn = typeof window.fetch
+
+// 401을 받으면 로그인 창을 띄우고, 로그인에 성공하면 막혔던 요청을 한 번 더 보냅니다.
+export function createLoginRetryFetch(
+  baseFetch: FetchFn,
+  askLogin: () => Promise<boolean>,
+  currentPath: () => string,
+): FetchFn {
+  return async (input, init) => {
+    const response = await baseFetch(input, init)
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
     if (
-      response.status === 401 &&
-      url.includes(API_BASE_URL) &&
-      !isAuthEndpoint(url) &&
-      !window.location.pathname.startsWith('/login')
+      response.status !== 401 ||
+      !url.includes(API_BASE_URL) ||
+      isAuthEndpoint(url) ||
+      currentPath().startsWith('/login')
     ) {
-      window.location.assign(loginUrlFor(window.location.pathname + window.location.search))
+      return response
     }
-    return response
+    const loggedIn = await askLogin()
+    return loggedIn ? baseFetch(input, init) : response
   }
+}
+
+export function installLoginRetry(): void {
+  const originalFetch = window.fetch.bind(window)
+  window.fetch = createLoginRetryFetch(
+    originalFetch,
+    requestLogin,
+    () => window.location.pathname,
+  )
 }

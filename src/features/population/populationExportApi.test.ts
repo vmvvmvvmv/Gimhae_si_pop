@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { populationExportParams } from './populationExportApi'
+import { MAX_EXPORT_MONTHS, monthSpan, populationExportParams, shiftStatsMonth } from './populationExportApi'
 
 describe('populationExportParams', () => {
   const base = {
@@ -25,5 +25,19 @@ describe('populationExportParams', () => {
     expect(params.get('stats_ym')).toBe('202503')
     expect(params.get('region_codes')).toBeNull()
     expect(params.get('from_ym')).toBeNull()
+  })
+})
+
+
+describe('export month helpers', () => {
+  it('shifts across year boundaries', () => {
+    expect(shiftStatsMonth('202609', -23)).toBe('202410')
+    expect(shiftStatsMonth('202601', -1)).toBe('202512')
+  })
+
+  it('counts both ends and matches the server limit', () => {
+    expect(monthSpan('202410', '202609')).toBe(MAX_EXPORT_MONTHS)
+    expect(monthSpan('202609', '202609')).toBe(1)
+    expect(monthSpan('201307', '202609')).toBeGreaterThan(MAX_EXPORT_MONTHS)
   })
 })

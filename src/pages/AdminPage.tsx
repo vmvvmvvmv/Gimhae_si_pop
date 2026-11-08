@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { API_BASE_URL } from '../lib/apiConfig'
 import { loginUrlFor } from '../lib/authRedirect'
+import './AdminPage.css'
 
 type SyncJob = {
   id: string
@@ -76,10 +77,10 @@ export default function AdminPage() {
     return () => window.clearInterval(timer)
   }, [isAdmin, hasActiveJob])
 
-  if (state === 'loading') return <main><p>관리자 인증 확인 중…</p></main>
+  if (state === 'loading') return <main className="admin-page"><p>관리자 인증 확인 중…</p></main>
   if (state === 'unauthenticated' || !session) {
     return (
-      <main>
+      <main className="admin-page">
         <h1>관리자 페이지</h1>
         <p>로그인이 필요합니다.</p>
         <a href={loginUrlFor('/admin')}>로그인으로 이동</a>
@@ -94,7 +95,7 @@ export default function AdminPage() {
 
   if (!isAdmin) {
     return (
-      <main>
+      <main className="admin-page">
         <h1>관리자 페이지</h1>
         <p>{session.username}님은 관리자 권한이 없어 이 페이지를 사용할 수 없습니다.</p>
         <button type="button" onClick={logout}>로그아웃</button>
@@ -127,7 +128,7 @@ export default function AdminPage() {
   }
 
   return (
-    <main>
+    <main className="admin-page">
       <h1>관리자 페이지</h1>
       <p>{session.username}님으로 로그인했습니다.</p>
       <h2>인구 데이터 동기화</h2>
@@ -166,8 +167,84 @@ export default function AdminPage() {
       <RequestsPanel kind="signup" title="회원가입 신청" />
       <RequestsPanel kind="reset" title="비밀번호 재설정 요청" />
       <AccountsPanel currentUsername={session.username} />
+      <AuditPanel />
       <button type="button" onClick={logout}>로그아웃</button>
     </main>
+  )
+}
+
+type AuditItem = {
+  at: number
+  actor: string
+  action: string
+  target: string | null
+  ip: string | null
+}
+
+const AUDIT_LABELS: Record<string, string> = {
+  login_success: '로그인 성공',
+  login_failed: '로그인 실패',
+  logout: '로그아웃',
+  user_create: '계정 생성',
+  user_delete: '계정 삭제',
+  user_activate: '계정 활성화',
+  user_deactivate: '계정 비활성화',
+  user_password_reset: '비밀번호 재설정(관리자)',
+  signup_approve: '가입 승인',
+  signup_reject: '가입 거절',
+  reset_code_issue: '재설정 코드 발급',
+  reset_reject: '재설정 거절',
+  password_reset_completed: '비밀번호 재설정 완료',
+  password_changed: '비밀번호 변경',
+  sync_start: '동기화 시작',
+  admin_recovery: '서버 명령으로 관리자 복구',
+}
+
+function AuditPanel() {
+  const [items, setItems] = useState<AuditItem[]>([])
+  const [error, setError] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/admin/audit`, { credentials: 'include' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(await errorMessage(response, '작업 기록을 불러오지 못했습니다.'))
+        return response.json() as Promise<{ items: AuditItem[] }>
+      })
+      .then((body) => {
+        setItems(body.items)
+        setError('')
+      })
+      .catch((loadError: unknown) =>
+        setError(loadError instanceof Error ? loadError.message : '작업 기록을 불러오지 못했습니다.'))
+  }, [reloadKey])
+
+  return (
+    <section>
+      <h2>작업 기록</h2>
+      <p>최근 100건입니다. 비밀번호와 재설정 코드는 기록하지 않습니다.</p>
+      <button type="button" onClick={() => setReloadKey((key) => key + 1)}>새로고침</button>
+      {error && <p role="alert">{error}</p>}
+      {items.length === 0 && !error && <p>기록이 없습니다.</p>}
+      {items.length > 0 && (
+        <table>
+          <thead>
+            <tr><th>시각</th><th>작업자</th><th>작업</th><th>대상</th><th>IP</th></tr>
+          </thead>
+          <tbody>
+            {items.map((item, index) => (
+              <tr key={`${item.at}-${index}`}>
+                <td>{new Date(item.at * 1000).toLocaleString('ko-KR')}</td>
+                <td>{item.actor}</td>
+                <td>{AUDIT_LABELS[item.action] ?? item.action}</td>
+                <td>{item.target ?? '-'}</td>
+                <td>{item.ip ?? '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
   )
 }
 
@@ -312,6 +389,17 @@ function AccountsPanel({ currentUsername }: { currentUsername: string }) {
     },
   ), '상태를 바꾸지 못했습니다.')
 
+  const deleteAccount = (account: Account) => {
+    const confirmed = window.confirm(
+      `${account.username} 계정을 삭제할까요?\n\n삭제하면 되돌릴 수 없고, 이 계정의 로그인과 대기 중인 요청도 함께 지워집니다.`,
+    )
+    if (!confirmed) return
+    return run(() => fetch(
+      `${API_BASE_URL}/admin/users/${encodeURIComponent(account.username)}`,
+      { method: 'DELETE', credentials: 'include' },
+    ), '계정을 삭제하지 못했습니다.')
+  }
+
   const resetPassword = (account: Account) => {
     const password = window.prompt(`${account.username}의 새 비밀번호(10자 이상)를 입력하세요.`)
     if (!password) return
@@ -349,24 +437,39 @@ function AccountsPanel({ currentUsername }: { currentUsername: string }) {
         </label>
         <button type="submit">계정 만들기</button>
       </form>
+      <p>
+        전체 {accounts.length}명 · 사용 중 {accounts.filter((a) => a.isActive).length}명 · 관리자 {accounts.filter((a) => a.role === 'admin').length}명
+      </p>
       <table>
         <thead>
-          <tr><th>아이디</th><th>역할</th><th>상태</th><th>관리</th></tr>
+          <tr><th>아이디</th><th>역할</th><th>상태</th><th>가입일</th><th>관리</th></tr>
         </thead>
         <tbody>
-          {accounts.map((account) => (
-            <tr key={account.username}>
-              <td>{account.username}{account.username === currentUsername && ' (나)'}</td>
-              <td>{account.role === 'admin' ? '관리자' : '일반 사용자'}</td>
-              <td>{account.isActive ? '사용 중' : '비활성'}</td>
-              <td>
-                <button type="button" onClick={() => void toggleActive(account)}>
-                  {account.isActive ? '비활성화' : '활성화'}
-                </button>{' '}
-                <button type="button" onClick={() => resetPassword(account)}>비밀번호 재설정</button>
-              </td>
-            </tr>
-          ))}
+          {accounts.map((account) => {
+            const isSelf = account.username === currentUsername
+            return (
+              <tr key={account.username}>
+                <td>{account.username}{isSelf && ' (나)'}</td>
+                <td>{account.role === 'admin' ? '관리자' : '일반 사용자'}</td>
+                <td>{account.isActive ? '사용 중' : '비활성'}</td>
+                <td>{new Date(account.createdAt * 1000).toLocaleDateString('ko-KR')}</td>
+                <td>
+                  <button type="button" onClick={() => void toggleActive(account)}>
+                    {account.isActive ? '비활성화' : '활성화'}
+                  </button>{' '}
+                  <button type="button" onClick={() => resetPassword(account)}>비밀번호 재설정</button>{' '}
+                  <button
+                    type="button"
+                    onClick={() => void deleteAccount(account)}
+                    disabled={isSelf}
+                    title={isSelf ? '지금 로그인한 계정은 삭제할 수 없습니다.' : undefined}
+                  >
+                    계정 삭제
+                  </button>
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </section>
