@@ -1,8 +1,10 @@
 import csv
 import unittest
 from io import StringIO
+from unittest.mock import patch
 
 from fastapi import HTTPException
+from starlette.requests import Request
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -53,6 +55,19 @@ class PopulationExportTests(unittest.TestCase):
 
     def tearDown(self):
         self.engine.dispose()
+
+    @staticmethod
+    def request_from(host: str = "127.0.0.1") -> Request:
+        return Request({
+            "type": "http",
+            "method": "GET",
+            "path": "/api/population/export/preview",
+            "headers": [],
+            "query_string": b"",
+            "client": (host, 1234),
+            "server": ("testserver", 80),
+            "scheme": "http",
+        })
 
     def test_region_range_uses_stored_months_and_blank_missing_change(self):
         with self.sessions() as db:
@@ -141,6 +156,7 @@ class PopulationExportTests(unittest.TestCase):
                 level="admin", scope="month", fields=["population", "households"],
                 region_code=None, region_codes=None,
                 from_ym=None, to_ym=None, stats_ym="202503", db=db,
+                request=self.request_from(),
             )
             preview = population_export_preview(**args)
             self.assertEqual(preview["count"], 2)
@@ -158,6 +174,55 @@ class PopulationExportTests(unittest.TestCase):
             with self.assertRaises(HTTPException) as raised:
                 population_export_preview(**{**args, "stats_ym": "202513"})
             self.assertEqual(raised.exception.status_code, 400)
+
+    def test_preview_rejects_export_over_5000_rows(self):
+        with self.sessions() as db:
+            region = db.get(Region, 1)
+            population = db.query(PopulationMonthly).filter_by(
+                region_id=1,
+                stats_ym="202503",
+            ).one()
+            with patch(
+                "app.services.population_export_service.list_export_population",
+                return_value=[(region, population)] * 5001,
+            ):
+                with self.assertRaises(HTTPException) as raised:
+                    population_export_preview(
+                        request=self.request_from("large-export-client"),
+                        level="admin",
+                        scope="month",
+                        fields=["population"],
+                        region_code=None,
+                        region_codes=None,
+                        from_ym=None,
+                        to_ym=None,
+                        stats_ym="202503",
+                        db=db,
+                    )
+        self.assertEqual(raised.exception.status_code, 413)
+
+    def test_export_rate_limit_rejects_sixth_request_from_same_ip(self):
+        args = dict(
+            level="admin", scope="month", fields=["population"],
+            region_code=None, region_codes=None,
+            from_ym=None, to_ym=None, stats_ym="202503",
+        )
+        with self.sessions() as db:
+            for index in range(5):
+                result = population_export_preview(
+                    **args,
+                    db=db,
+                    request=self.request_from("rate-limit-client"),
+                )
+                self.assertEqual(result["count"], 2, index)
+            with self.assertRaises(HTTPException) as raised:
+                population_export_preview(
+                    **args,
+                    db=db,
+                    request=self.request_from("rate-limit-client"),
+                )
+        self.assertEqual(raised.exception.status_code, 429)
+        self.assertEqual(raised.exception.headers["Retry-After"], "60")
 
 
 if __name__ == "__main__":

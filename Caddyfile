@@ -1,3 +1,10 @@
 {$SITE_DOMAIN} {
-    reverse_proxy app:8000
+    # 나머지 보안 헤더는 앱(security_headers.py)이 한 곳에서 붙입니다.
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    }
+    # 클라이언트 IP를 Caddy가 직접 채워서 보내므로, 요청자가 X-Forwarded-For를 위조할 수 없습니다.
+    reverse_proxy app:8000 {
+        header_up X-Forwarded-For {remote_host}
+    }
 }

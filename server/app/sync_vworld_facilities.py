@@ -455,7 +455,10 @@ def main() -> None:
         if args.category == "ALL"
         else (args.category,)
     )
-    asyncio.run(sync_categories(categories))
+    from .services.sync_lock import sync_lock
+
+    with sync_lock("database"):
+        asyncio.run(sync_categories(categories))
 
 
 if __name__ == "__main__":

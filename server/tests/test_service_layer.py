@@ -1,3 +1,5 @@
+import tempfile
+from pathlib import Path
 import unittest
 from datetime import datetime, timezone
 from unittest.mock import patch
@@ -15,6 +17,9 @@ from app.services.development_sync_service import (
     replace_development_notices,
     save_official_notice_statuses,
 )
+from app.services.account_store import AccountStore
+from app.services.admin_auth import SESSION_COOKIE_NAME, hash_password, issue_session
+from app.services.admin_session_store import AdminSessionStore
 from app.sync_vworld_facilities import REQUIRED_TRANSIT_STATIONS, validate_transit_coverage
 
 
@@ -34,6 +39,22 @@ class ServiceLayerApiTests(unittest.TestCase):
 
         app.dependency_overrides[get_db] = test_db
         self.client = TestClient(app)
+        # 기능 API는 로그인이 필요하므로, 임시 계정으로 로그인한 쿠키를 붙입니다.
+        self._login_tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._login_tmp.cleanup)
+        accounts = AccountStore(Path(self._login_tmp.name) / "accounts.db")
+        accounts.create("tester", hash_password("tester-password"), "user")
+        for name, value in [
+            ("ACCOUNT_STORE", accounts),
+            ("SESSION_STORE", AdminSessionStore(Path(self._login_tmp.name) / "sessions.db")),
+            ("ADMIN_SESSION_SECRET", "test-secret"),
+            ("ADMIN_USERNAME", "root"),
+            ("ADMIN_PASSWORD_HASH", "configured"),
+        ]:
+            patcher = patch(f"app.services.admin_auth.{name}", value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.client.cookies.set(SESSION_COOKIE_NAME, issue_session("tester"))
 
     def tearDown(self):
         self.client.close()

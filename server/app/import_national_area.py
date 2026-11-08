@@ -2,8 +2,10 @@ import argparse
 
 from .db import SessionLocal
 from .services.population_sync_service import save_national_area_result
+from .services.sync_lock import database_write_lock
 
 
+@database_write_lock
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="연도별 대한민국 국토면적을 SQLite에 저장합니다.",

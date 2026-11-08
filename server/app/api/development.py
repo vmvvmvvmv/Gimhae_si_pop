@@ -4,10 +4,11 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from ..db import get_db
+from ..services.admin_auth import require_user
 from ..services.development_service import list_development_notices
 
 
-router = APIRouter(tags=["development"])
+router = APIRouter(tags=["development"], dependencies=[Depends(require_user)])
 
 
 @router.get("/api/development/notices")

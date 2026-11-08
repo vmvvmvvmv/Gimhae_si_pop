@@ -12,6 +12,7 @@ from .models import (
     Region,
 )
 from .sync_kosis_admin_population import sync_month
+from .services.sync_lock import database_write_lock
 
 
 def validate_stats_ym(value: str) -> str:
@@ -70,6 +71,7 @@ def get_existing_months() -> set[str]:
         )
 
 
+@database_write_lock
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--from-ym", type=validate_stats_ym)

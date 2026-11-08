@@ -1,3 +1,10 @@
+# 컨테이너 로그가 디스크를 채우지 않도록 파일당 10MB, 최대 5개까지만 보관합니다.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   app:
     build:
@@ -7,8 +14,16 @@ services:
         VITE_NAVER_MAP_CLIENT_ID: ${VITE_NAVER_MAP_CLIENT_ID:?Set the NAVER Maps client ID in deploy.env}
     image: gimhae-map:latest
     restart: unless-stopped
+    logging: *default-logging
     environment:
       ENABLE_LIVE_MOIS_PROXY: "false"
+      REQUIRE_LOGIN_FOR_POPULATION_DATA: ${REQUIRE_LOGIN_FOR_POPULATION_DATA:-true}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?Set ADMIN_USERNAME in deploy.env}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:?Set ADMIN_PASSWORD_HASH in deploy.env}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:?Set ADMIN_SESSION_SECRET in deploy.env}
+      ADMIN_COOKIE_SECURE: "true"
+      MOIS_SERVICE_KEY: ${MOIS_SERVICE_KEY:?Set MOIS_SERVICE_KEY in deploy.env}
+      CORS_ORIGINS: https://${SITE_DOMAIN:?Set SITE_DOMAIN in deploy.env}
     volumes:
       - type: bind
         source: ./server/data
@@ -18,9 +33,31 @@ services:
     networks:
       - app_net
 
+  backup:
+    image: gimhae-map:latest
+    pull_policy: never
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      app:
+        condition: service_healthy
+    command: ["python", "-m", "app.backup_database", "--daily", "--keep", "14"]
+    environment:
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - type: bind
+        source: ./server/data
+        target: /app/server/data
+        bind:
+          create_host_path: false
+    healthcheck:
+      disable: true
+    network_mode: none
+
   caddy:
     image: caddy:2
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       app:
         condition: service_healthy

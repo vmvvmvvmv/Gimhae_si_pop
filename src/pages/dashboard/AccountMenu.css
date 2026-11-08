@@ -1,0 +1,39 @@
+.account-menu {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-left: auto;
+  color: #405a72;
+  font: 700 12px Pretendard, 'Noto Sans KR', sans-serif;
+}
+
+.account-menu-name {
+  color: #183b60;
+}
+
+.account-menu a {
+  color: #236bb5;
+}
+
+.account-menu button {
+  border: 1px solid #b9cfe3;
+  border-radius: 9px;
+  padding: 7px 10px;
+  color: #22599a;
+  background: #f3f8fd;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.account-menu button:hover {
+  background: #e5f1fd;
+}
+
+.account-menu a:focus-visible,
+.account-menu button:focus-visible {
+  outline: 2px solid #236bb5;
+  outline-offset: 2px;
+}

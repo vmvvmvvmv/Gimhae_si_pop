@@ -14,6 +14,7 @@ from sqlalchemy import select
 from .db import SessionLocal
 from .models import Region
 from .services.population_sync_service import save_local_population_result
+from .services.sync_lock import database_write_lock
 
 
 JUMIN_BASE_URL = "https://jumin.mois.go.kr"
@@ -223,6 +224,7 @@ def sync_month(
     return saved_count, missing_count
 
 
+@database_write_lock
 def sync_history(
     from_year: int,
     from_month: int,

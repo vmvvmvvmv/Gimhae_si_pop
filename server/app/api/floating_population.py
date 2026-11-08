@@ -4,13 +4,14 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from ..db import get_db
+from ..services.admin_auth import require_user
 from ..services.floating_population_service import (
     get_availability,
     get_monthly_population,
 )
 
 
-router = APIRouter(tags=["floating-population"])
+router = APIRouter(tags=["floating-population"], dependencies=[Depends(require_user)])
 
 
 @router.get("/api/floating-population/availability")

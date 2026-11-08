@@ -1,16 +1,19 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from ..db import get_db
+from ..core.config import REQUIRE_LOGIN_FOR_POPULATION_DATA
+from ..services.admin_auth import require_user
 from ..services.mois_proxy_service import (
     LiveProxyError,
     fetch_live_age_population,
     fetch_live_population,
 )
 from ..services.population_service import PopulationLevel
+from ..services.export_limits import ExportLimitError, ExportRateLimiter
 from ..services.population_export_service import (
     NoExportData,
     population_export_csv,
@@ -26,6 +29,23 @@ from ..services.population_query_service import (
 
 
 router = APIRouter()
+export_rate_limiter = ExportRateLimiter()
+
+
+def _require_login_for_population_data(request: Request) -> None:
+    """설정이 켜져 있을 때만 지역 인구 조회에 로그인을 요구합니다."""
+    if REQUIRE_LOGIN_FOR_POPULATION_DATA:
+        require_user(request)
+
+
+def _enforce_export_rate_limit(request: Request) -> None:
+    client_key = request.client.host if request.client else "unknown"
+    if not export_rate_limiter.allow(client_key):
+        raise HTTPException(
+            status_code=429,
+            detail="CSV export 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
+            headers={"Retry-After": "60"},
+        )
 
 
 def _read_export(
@@ -44,6 +64,8 @@ def _read_export(
             db, level, scope, fields, region_code, from_ym, to_ym, stats_ym,
             region_codes,
         )
+    except ExportLimitError as error:
+        raise HTTPException(status_code=error.status_code, detail=error.detail) from error
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     except NoExportData as error:
@@ -53,8 +75,9 @@ def _read_export(
         ) from error
 
 
-@router.get("/api/population/export/preview")
+@router.get("/api/population/export/preview", dependencies=[Depends(require_user)])
 def population_export_preview(
+    request: Request,
     level: PopulationLevel = Query("admin"),
     scope: Literal["region", "month"] = Query(...),
     fields: list[str] = Query(...),
@@ -65,12 +88,14 @@ def population_export_preview(
     region_codes: list[str] | None = Query(None),
     db: Session = Depends(get_db),
 ) -> dict:
+    _enforce_export_rate_limit(request)
     export = _read_export(db, level, scope, fields, region_code, from_ym, to_ym, stats_ym, region_codes)
     return {"columns": export["columns"], "rows": export["rows"][:5], "count": export["count"]}
 
 
-@router.get("/api/population/export.csv")
+@router.get("/api/population/export.csv", dependencies=[Depends(require_user)])
 def download_population_export(
+    request: Request,
     level: PopulationLevel = Query("admin"),
     scope: Literal["region", "month"] = Query(...),
     fields: list[str] = Query(...),
@@ -81,6 +106,7 @@ def download_population_export(
     region_codes: list[str] | None = Query(None),
     db: Session = Depends(get_db),
 ) -> Response:
+    _enforce_export_rate_limit(request)
     export = _read_export(db, level, scope, fields, region_code, from_ym, to_ym, stats_ym, region_codes)
     period = stats_ym if scope == "month" else f"{from_ym}-{to_ym}"
     filename = f"gimhae_population_{level}_{scope}_{period}.csv"
@@ -121,7 +147,7 @@ def live_proxy_http_error(error: LiveProxyError, *, age: bool) -> HTTPException:
     )
 
 
-@router.get("/api/population/admin-ages")
+@router.get("/api/population/admin-ages", dependencies=[Depends(require_user)])
 async def admin_age_population(
     admm_cd: str = Query(
         "4825025000",
@@ -143,7 +169,7 @@ async def admin_age_population(
     )
 
 
-@router.get("/api/population/regions")
+@router.get("/api/population/regions", dependencies=[Depends(_require_login_for_population_data)])
 async def region_population(
     level: PopulationLevel = Query("admin"),
     year: int = Query(2025, ge=2000, le=2100),
@@ -158,7 +184,7 @@ async def region_population(
     )
 
 
-@router.get("/api/population/availability")
+@router.get("/api/population/availability", dependencies=[Depends(_require_login_for_population_data)])
 async def population_availability(db: Session = Depends(get_db)) -> JSONResponse:
     result = read_availability(db)
     return JSONResponse(
@@ -167,7 +193,7 @@ async def population_availability(db: Session = Depends(get_db)) -> JSONResponse
     )
 
 
-@router.get("/api/population/comparison")
+@router.get("/api/population/comparison", dependencies=[Depends(require_user)])
 async def population_comparison(
     level: PopulationLevel = Query("admin"),
     region_code: str = Query(
@@ -196,7 +222,7 @@ async def population_comparison(
     )
 
 
-@router.get("/api/population/trend")
+@router.get("/api/population/trend", dependencies=[Depends(require_user)])
 async def population_trend(
     level: PopulationLevel = Query("admin"),
     region_code: str = Query(
@@ -232,7 +258,7 @@ async def population_trend(
     )
 
 
-@router.get("/api/population/admin-regions")
+@router.get("/api/population/admin-regions", dependencies=[Depends(_require_login_for_population_data)])
 async def admin_region_population(
     year: int = Query(2025, ge=2000, le=2100),
     month: int = Query(12, ge=1, le=12),
@@ -244,7 +270,7 @@ async def admin_region_population(
     )
 
 
-@router.get("/api/population/legal-regions")
+@router.get("/api/population/legal-regions", dependencies=[Depends(_require_login_for_population_data)])
 async def legal_region_population(
     year: int = Query(2025, ge=2000, le=2100),
     month: int = Query(12, ge=1, le=12),
@@ -256,7 +282,7 @@ async def legal_region_population(
     )
 
 
-@router.get("/api/population")
+@router.get("/api/population", dependencies=[Depends(require_user)])
 async def population(
     level: Literal["admin", "legal"] = Query("admin"),
     year: int = Query(2025, ge=2000, le=2100),

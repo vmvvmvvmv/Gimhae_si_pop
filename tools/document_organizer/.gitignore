@@ -1,0 +1,10 @@
+models/
+.venv/
+runs/
+build/
+dist/
+/*.spec
+build_compact/
+build_no_console/
+__pycache__/
+*.exe

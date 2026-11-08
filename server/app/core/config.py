@@ -6,6 +6,9 @@ from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 load_dotenv(PROJECT_ROOT / ".env")
+# 백엔드만 개발할 때는 server/.env도 사용할 수 있습니다.
+# 두 파일에 같은 변수가 있으면 프로젝트 루트의 .env 값을 우선합니다.
+load_dotenv(PROJECT_ROOT / "server" / ".env")
 
 MOIS_SERVICE_KEY = os.getenv("MOIS_SERVICE_KEY", "").strip()
 SGIS_ACCESS_TOKEN = os.getenv("SGIS_ACCESS_TOKEN", "").strip()
@@ -28,12 +31,37 @@ CORS_ORIGINS = tuple(
     origin.strip()
     for origin in os.getenv(
         "CORS_ORIGINS",
-        "http://localhost:5173,http://localhost:5174",
+        "http://localhost:5173,http://localhost:5174,"
+        "http://127.0.0.1:5173,http://127.0.0.1:5174",
     ).split(",")
     if origin.strip()
 )
 ENABLE_LIVE_MOIS_PROXY = _parse_bool(
     os.getenv("ENABLE_LIVE_MOIS_PROXY"),
+)
+# API 문서(/docs, /openapi.json)는 운영에서 숨깁니다. 필요할 때만 true로 켭니다.
+ENABLE_API_DOCS = _parse_bool(os.getenv("ENABLE_API_DOCS"))
+# 지역 인구 조회(지도 화면이 쓰는 데이터)는 기본적으로 로그인해야 볼 수 있습니다. 공개하려면 false로 둡니다.
+REQUIRE_LOGIN_FOR_POPULATION_DATA = _parse_bool(
+    os.getenv("REQUIRE_LOGIN_FOR_POPULATION_DATA"),
+    default=True,
+)
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "").strip()
+ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH", "").strip()
+ADMIN_SESSION_SECRET = os.getenv("ADMIN_SESSION_SECRET", "").strip()
+try:
+    ADMIN_SESSION_TTL_SECONDS = int(
+        os.getenv("ADMIN_SESSION_TTL_SECONDS", "28800"),
+    )
+except ValueError:
+    ADMIN_SESSION_TTL_SECONDS = 28800
+try:
+    ADMIN_SESSION_IDLE_SECONDS = int(os.getenv("ADMIN_SESSION_IDLE_SECONDS", "1800"))
+except ValueError:
+    ADMIN_SESSION_IDLE_SECONDS = 1800
+ADMIN_COOKIE_SECURE = _parse_bool(
+    os.getenv("ADMIN_COOKIE_SECURE"),
+    default=False,
 )
 
 try:

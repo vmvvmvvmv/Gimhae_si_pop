@@ -116,7 +116,10 @@ def main() -> None:
     args = parser.parse_args()
 
     stats_ym = f"{args.year}{args.month:02d}"
-    raw_count, count = sync_month(stats_ym)
+    from .services.sync_lock import sync_lock
+
+    with sync_lock("database"):
+        raw_count, count = sync_month(stats_ym)
 
     print(f"KOSIS 원본 행 수: {raw_count}")
     print(f"전국 읍면동 인구 동기화 완료: {stats_ym}, {count}개")

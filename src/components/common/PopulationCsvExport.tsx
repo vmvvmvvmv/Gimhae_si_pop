@@ -2,9 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import type { PopulationLevel } from '../../features/population/populationApi'
 import { legalCodesForAdminSelection } from '../../features/boundaries/legalAdministrativeSelection'
 import {
+  MAX_EXPORT_MONTHS,
   POPULATION_EXPORT_FIELDS,
   downloadPopulationExport,
   fetchPopulationExportPreview,
+  monthSpan,
+  shiftStatsMonth,
   type PopulationExportField,
   type PopulationExportOptions,
   type PopulationExportPreview,
@@ -23,6 +26,13 @@ interface PopulationCsvExportProps {
 const DEFAULT_FIELDS: PopulationExportField[] = [
   'population', 'malePopulation', 'femalePopulation', 'households',
 ]
+
+// 기본 시작월은 기준월부터 최대 24개월 전(서버 제한)이고, 자료가 시작되는 달보다 이전으로 가지 않습니다.
+const defaultFromYm = (availableMonths: string[], statsYm: string) => {
+  const earliest = availableMonths[0] ?? statsYm
+  const limited = shiftStatsMonth(statsYm, -(MAX_EXPORT_MONTHS - 1))
+  return limited > earliest ? limited : earliest
+}
 
 const monthInputValue = (value: string) =>
   /^\d{6}$/.test(value) ? `${value.slice(0, 4)}-${value.slice(4)}` : ''
@@ -46,7 +56,8 @@ export default function PopulationCsvExport({
   )
   const [regionSearch, setRegionSearch] = useState('')
   const [administrativeFilter, setAdministrativeFilter] = useState('')
-  const [fromYm, setFromYm] = useState(availableMonths[0] ?? statsYm)
+  // 기본 기간은 기준월부터 최대 24개월(서버 제한)이고, 자료가 시작되는 달보다 이전으로 가지 않습니다.
+  const [fromYm, setFromYm] = useState(() => defaultFromYm(availableMonths, statsYm))
   const [toYm, setToYm] = useState(statsYm)
   const [fields, setFields] = useState<PopulationExportField[]>(DEFAULT_FIELDS)
   const [preview, setPreview] = useState<PopulationExportPreview | null>(null)
@@ -77,7 +88,7 @@ export default function PopulationCsvExport({
     setSelectedRegionCodes(initialRegionCode ? [initialRegionCode] : [])
     setRegionSearch('')
     setAdministrativeFilter('')
-    setFromYm(firstMonth)
+    setFromYm(defaultFromYm(availableMonths, statsYm))
     setToYm(statsYm)
     setFields([...DEFAULT_FIELDS])
     if (regionPickerRef.current) regionPickerRef.current.open = false
@@ -116,7 +127,8 @@ export default function PopulationCsvExport({
 
   const periodValid = Boolean(
     selectedRegionCodes.length > 0 && fromYm && toYm &&
-    fromYm >= firstMonth && toYm <= lastMonth && fromYm <= toYm,
+    fromYm >= firstMonth && toYm <= lastMonth && fromYm <= toYm &&
+    monthSpan(fromYm, toYm) <= MAX_EXPORT_MONTHS,
   )
   const valid = fields.length > 0 && periodValid
 
@@ -343,7 +355,9 @@ export default function PopulationCsvExport({
                   ? '시작월과 종료월을 골라주세요.'
                   : fromYm > toYm
                     ? '시작월이 종료월보다 늦습니다.'
-                    : '조회 가능한 기간 안에서 월을 골라주세요.'}
+                    : monthSpan(fromYm, toYm) > MAX_EXPORT_MONTHS
+                      ? `한 번에 내려받을 수 있는 기간은 최대 ${MAX_EXPORT_MONTHS}개월입니다.`
+                      : '조회 가능한 기간 안에서 월을 골라주세요.'}
           </p>}
           {error && <p className="population-export-error" role="alert">{error}</p>}
 

@@ -1,5 +1,6 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import AgeDistributionChart from '../components/common/AgeDistributionChart'
 import PopulationTrendChart from '../components/common/PopulationTrendChart'
 import RegionComparisonTable from '../components/common/RegionComparisonTable'
@@ -11,6 +12,7 @@ import NaverMap, {
   type AddressSearchResult,
 } from '../components/map/NaverMap'
 import NaverRoadview from '../components/map/NaverRoadview'
+import MapErrorBoundary from '../components/map/MapErrorBoundary'
 import {
   getRegionCode,
   getRegionName,
@@ -44,6 +46,10 @@ import {
   type FacilityItem,
 } from '../features/facilities/facilityApi'
 import mapIcon from '../assets/map_icon.png'
+import AccountMenu from './dashboard/AccountMenu'
+import { DashboardRailIcon } from './dashboard/DashboardRailIcon'
+import { BoundaryFilter, PeriodFilters } from './dashboard/DashboardFilters'
+import { formatChange, formatLegendPopulation, getFeatureCenter, getSearchScore, normalizeSearchText } from './dashboard/dashboardFormat'
 import { fetchDevelopmentNotices } from '../features/development/developmentApi'
 import {
   createDevelopmentSelection,
@@ -107,143 +113,6 @@ type SiteSearchResult =
       score: number
       facility: FacilityItem
     }
-type RailIconName =
-  | 'map'
-  | 'search'
-  | 'detail'
-  | 'layers'
-  | 'development'
-  | 'facility'
-
-function DashboardRailIcon({ name }: { name: RailIconName }) {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      {name === 'map' && (
-        <>
-          <path d="m4 6 5-2 6 2 5-2v14l-5 2-6-2-5 2V6Z" />
-          <path d="M9 4v14M15 6v14" />
-        </>
-      )}
-      {name === 'search' && (
-        <>
-          <circle cx="10.5" cy="10.5" r="6.5" />
-          <path d="m15.5 15.5 4.5 4.5" />
-        </>
-      )}
-      {name === 'detail' && (
-        <>
-          <rect x="4" y="3" width="16" height="18" rx="3" />
-          <path d="M8 8h8M8 12h8M8 16h5" />
-        </>
-      )}
-      {name === 'layers' && (
-        <>
-          <path d="m12 3 8 4.5-8 4.5-8-4.5L12 3Z" />
-          <path d="m4 12 8 4.5 8-4.5M4 16.5l8 4.5 8-4.5" />
-        </>
-      )}
-      {name === 'development' && (
-        <>
-          <path d="M4 19V8l5-3 6 3 5-3v11l-5 3-6-3-5 3Z" />
-          <path d="M9 5v11M15 8v11" />
-        </>
-      )}
-      {name === 'facility' && (
-        <>
-          <path d="M4 20V9l8-5 8 5v11H4Z" />
-          <path d="M9 20v-6h6v6M8 10h.01M12 10h.01M16 10h.01" />
-        </>
-      )}
-    </svg>
-  )
-}
-
-function formatChange(change: number | null, changeRate: number | null) {
-  if (change === null || changeRate === null) {
-    return <span className="population-change unavailable">비교 데이터 없음</span>
-  }
-
-  const sign = change > 0 ? '+' : ''
-  const direction = change > 0
-    ? 'increase'
-    : change < 0
-      ? 'decrease'
-      : 'steady'
-  const arrow = change > 0 ? '▲' : change < 0 ? '▼' : '―'
-  return (
-    <span className={`population-change ${direction}`}>
-      <span className="population-change-arrow" aria-hidden="true">
-        {arrow}
-      </span>
-      {sign}{change.toLocaleString()}명 ({sign}{changeRate.toFixed(2)}%)
-    </span>
-  )
-}
-
-function formatLegendPopulation(value: number): string {
-  if (value >= 10_000) {
-    const tenThousands = value / 10_000
-    return `${tenThousands >= 10 ? Math.round(tenThousands) : tenThousands.toFixed(1)}만`
-  }
-  if (value >= 1_000) {
-    return `${(value / 1_000).toFixed(1)}천`
-  }
-  return value.toLocaleString()
-}
-
-function normalizeSearchText(value: string): string {
-  return value
-    .replace(/경상남도|김해시/g, '')
-    .replace(/[^0-9A-Za-z가-힣]/g, '')
-    .toLocaleLowerCase('ko-KR')
-}
-
-function getSearchScore(value: string, query: string): number {
-  const normalizedValue = normalizeSearchText(value)
-  if (normalizedValue === query) return 0
-  if (normalizedValue.startsWith(query)) return 1
-  return normalizedValue.includes(query) ? 2 : Number.POSITIVE_INFINITY
-}
-
-function getFeatureCenter(feature: GeoJsonFeature): {
-  latitude: number
-  longitude: number
-} | null {
-  let minimumLongitude = Number.POSITIVE_INFINITY
-  let maximumLongitude = Number.NEGATIVE_INFINITY
-  let minimumLatitude = Number.POSITIVE_INFINITY
-  let maximumLatitude = Number.NEGATIVE_INFINITY
-
-  const visit = (value: unknown) => {
-    if (!Array.isArray(value)) return
-    if (
-      value.length >= 2 &&
-      typeof value[0] === 'number' &&
-      typeof value[1] === 'number'
-    ) {
-      minimumLongitude = Math.min(minimumLongitude, value[0])
-      maximumLongitude = Math.max(maximumLongitude, value[0])
-      minimumLatitude = Math.min(minimumLatitude, value[1])
-      maximumLatitude = Math.max(maximumLatitude, value[1])
-      return
-    }
-    value.forEach(visit)
-  }
-
-  visit(feature.geometry.coordinates)
-  if (
-    !Number.isFinite(minimumLongitude) ||
-    !Number.isFinite(maximumLongitude) ||
-    !Number.isFinite(minimumLatitude) ||
-    !Number.isFinite(maximumLatitude)
-  ) {
-    return null
-  }
-  return {
-    latitude: (minimumLatitude + maximumLatitude) / 2,
-    longitude: (minimumLongitude + maximumLongitude) / 2,
-  }
-}
 
 export default function DashboardPage() {
   // 이 페이지가 지도·조회 조건·선택 지역·상세 패널의 공통 상태를 소유합니다.
@@ -1086,6 +955,10 @@ export default function DashboardPage() {
             <DashboardRailIcon name="facility" />
             주요 시설
           </div>
+          <Link to="/report-figures">
+            <DashboardRailIcon name="layers" />
+            GIS 자료
+          </Link>
         </div>
         <button
           type="button"
@@ -1099,79 +972,35 @@ export default function DashboardPage() {
       </nav>
 
       <section className="filter-card" id="dashboard-filters" aria-label="조회 조건">
-        <div className="boundary-filter">
-          <span className="filter-label">지역 구분</span>
-          <div className="boundary-tabs" aria-label="지역 구분 선택">
-            <button
-              type="button"
-              aria-pressed={boundaryType === 'administrative'}
-              className={boundaryType === 'administrative' ? 'active' : ''}
-              onClick={() => {
-                setBoundaryType('administrative')
-                setSelectedRegion(null)
-                setPairComparison(null)
-                clearAddressSearch()
-              }}
-            >
-              행정동
-            </button>
+        <BoundaryFilter
+          value={boundaryType}
+          onChange={(next) => {
+            setBoundaryType(next)
+            setSelectedRegion(null)
+            setPairComparison(null)
+            clearAddressSearch()
+          }}
+        />
 
-            <button
-              type="button"
-              aria-pressed={boundaryType === 'legal'}
-              className={boundaryType === 'legal' ? 'active' : ''}
-              onClick={() => {
-                setBoundaryType('legal')
-                setSelectedRegion(null)
-                setPairComparison(null)
-                clearAddressSearch()
-              }}
-            >
-              법정동
-            </button>
-          </div>
-        </div>
-
-        <label className="filter-field">
-          <span>연도</span>
-          <select
-            value={effectiveYear}
-            onChange={(event) => setSelectedStatsYm(selectPopulationMonthInYear(
-              availabilityItems,
-              populationLevel,
-              Number(event.target.value),
-              effectiveMonth,
-            ))}
-            disabled={availabilityQuery.isLoading || !availableYears.length}
-          >
-            {availableYears.map((optionYear) => (
-              <option key={optionYear} value={optionYear}>
-                {optionYear}년
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="filter-field">
-          <span>월</span>
-          <select
-            value={effectiveMonth}
-            onChange={(event) => setSelectedStatsYm(
-              `${effectiveYear}${event.target.value.padStart(2, '0')}`,
-            )}
-            disabled={
-              availabilityQuery.isLoading || !availableMonthsInYear.length
-            }
-          >
-            {availableMonthsInYear.map((optionMonth) => (
-              <option key={optionMonth} value={optionMonth}>
-                {optionMonth}월{availabilityItems.find(
-                  (item) => item.statsYm === `${effectiveYear}${String(optionMonth).padStart(2, '0')}`,
-                )?.complete === false ? ' (일부)' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
+        <PeriodFilters
+          years={availableYears}
+          year={effectiveYear}
+          months={availableMonthsInYear}
+          month={effectiveMonth}
+          loading={availabilityQuery.isLoading}
+          isPartialMonth={(optionMonth) => availabilityItems.find(
+            (item) => item.statsYm === `${effectiveYear}${String(optionMonth).padStart(2, '0')}`,
+          )?.complete === false}
+          onYearChange={(optionYear) => setSelectedStatsYm(selectPopulationMonthInYear(
+            availabilityItems,
+            populationLevel,
+            optionYear,
+            effectiveMonth,
+          ))}
+          onMonthChange={(optionMonth) => setSelectedStatsYm(
+            `${effectiveYear}${String(optionMonth).padStart(2, '0')}`,
+          )}
+        />
 
         <PopulationCsvExport
           level={populationLevel}
@@ -1181,6 +1010,9 @@ export default function DashboardPage() {
           statsYm={effectiveStatsYm}
           availableMonths={availableMonths}
         />
+        <Link className="dashboard-figure-mobile-link" to="/report-figures">
+          GIS 자료
+        </Link>
 
         {populationQuery.isFetching && (
           <span className="query-status loading" role="status">
@@ -1358,6 +1190,7 @@ export default function DashboardPage() {
           <span aria-hidden="true">?</span>
           사용 안내
         </button>
+        <AccountMenu />
       </section>
 
       <section className="dashboard-grid">
@@ -1581,6 +1414,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          <MapErrorBoundary label="지도">
           <NaverMap
             boundaryType={boundaryType}
             selectedRegion={selectedRegion}
@@ -1616,6 +1450,7 @@ export default function DashboardPage() {
             showDevelopmentAreas={showDevelopmentAreas}
             developmentNotices={developmentNoticesQuery.data?.items}
           />
+          </MapErrorBoundary>
         </div>
 
         <aside className="detail-card" id="region-detail" aria-live="polite">
@@ -1733,6 +1568,7 @@ export default function DashboardPage() {
                 </span>
               </div>
               {selectedFacility && (
+                <MapErrorBoundary label="거리뷰" key={selectedFacility.id}>
                 <NaverRoadview
                   key={selectedFacility.id}
                   latitude={selectedFacility.latitude}
@@ -1740,6 +1576,7 @@ export default function DashboardPage() {
                   placeName={selectedFacility.name}
                   address={selectedFacility.roadAddress || selectedFacility.parcelAddress}
                 />
+                </MapErrorBoundary>
               )}
               {selectedFacility?.imageUrl && (
                 <figure className="selection-photo">
@@ -1933,12 +1770,11 @@ export default function DashboardPage() {
                       >
                         <div className="section-title">
                           <div>
-                            <small>지역 안 시설</small>
+                            <small>주요 시설</small>
                             <h3 id="reorganization-analysis-title">
                               경계와 생활권
                             </h3>
                           </div>
-                          <span>선택한 지역 안에서 집계</span>
                         </div>
                         <div className="reorganization-indicator-grid">
                           <article className="natural-barrier">

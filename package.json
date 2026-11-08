@@ -11,7 +11,9 @@
     "lint": "eslint .",
     "optimize:geojson": "node tools/optimize-map-geojson.mjs",
     "test": "vitest run --maxWorkers=1 --no-isolate",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:server": "node scripts/test-server.mjs",
+    "test:all": "npm run lint && npm run test && npm run test:server"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.102.8",

@@ -4,6 +4,7 @@ export type BoundaryType = 'administrative' | 'legal'
 
 export interface GeoJsonFeature {
   type: 'Feature'
+  id?: string | number
   properties: Record<string, unknown>
   geometry: {
     type: string
@@ -149,6 +150,16 @@ export async function loadDevelopmentAreas(): Promise<GeoJsonCollection> {
 
   if (!response.ok) {
     throw new Error('개발 관련 구역 GeoJSON 파일을 불러오지 못했습니다.')
+  }
+
+  return (await response.json()) as GeoJsonCollection
+}
+
+export async function loadOfficialParks(): Promise<GeoJsonCollection> {
+  const response = await fetch('/data/gimhae_official_parks.geojson')
+
+  if (!response.ok) {
+    throw new Error('공식 도시공원 GeoJSON 파일을 불러오지 못했습니다.')
   }
 
   return (await response.json()) as GeoJsonCollection

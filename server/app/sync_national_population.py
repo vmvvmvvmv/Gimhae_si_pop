@@ -10,6 +10,7 @@ from .services.national_population_service import (
     validate_national_result,
 )
 from .services.population_sync_service import save_national_population_result
+from .services.sync_lock import sync_lock
 
 
 def month_sequence(from_year: int, from_month: int, to_year: int, to_month: int):
@@ -68,4 +69,5 @@ def parse_args() -> argparse.Namespace:
 
 
 if __name__ == "__main__":
-    asyncio.run(sync(parse_args()))
+    with sync_lock("database"):
+        asyncio.run(sync(parse_args()))

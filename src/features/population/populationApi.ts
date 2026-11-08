@@ -220,7 +220,7 @@ export async function fetchPopulation(
         message = error.detail.message
       }
     } catch {
-      // Keep the default message when the server response is not JSON.
+      // 서버 응답이 JSON이 아니면 기본 오류 메시지를 유지합니다.
     }
 
     throw new Error(message)
@@ -274,7 +274,7 @@ export async function fetchPopulationComparison(
         message = error.detail
       }
     } catch {
-      // Keep the default message when the response is not JSON.
+      // 응답이 JSON이 아니면 기본 오류 메시지를 유지합니다.
     }
     throw new Error(message)
   }

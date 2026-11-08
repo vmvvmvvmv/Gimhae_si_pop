@@ -27,6 +27,7 @@ from .sync_official_notice_links import (
 from .db import SessionLocal
 from .official_notice_status import AUDIT_REASON_TO_STATUS
 from .services.development_sync_service import save_official_notice_statuses
+from .services.sync_lock import sync_lock
 
 
 REASON_LABELS = {
@@ -308,8 +309,9 @@ def main() -> None:
             row.notice.source_id: AUDIT_REASON_TO_STATUS[row.reason]
             for row in rows
         }
-        with SessionLocal.begin() as db:
-            saved_status_count = save_official_notice_statuses(db, statuses)
+        with sync_lock("database"):
+            with SessionLocal.begin() as db:
+                saved_status_count = save_official_notice_statuses(db, statuses)
         print(f"공식 원문 확인 상태 저장 완료: {saved_status_count}건")
 
     counts = Counter(row.reason for row in rows)

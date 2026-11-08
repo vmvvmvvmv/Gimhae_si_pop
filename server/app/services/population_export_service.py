@@ -1,5 +1,4 @@
 import csv
-import re
 from io import StringIO
 from typing import Any, Literal
 
@@ -11,6 +10,10 @@ from ..repositories.population_export_repository import (
     list_export_population,
 )
 from ..repositories.population_repository import shift_month
+from .export_limits import (
+    MAX_EXPORT_ROWS,
+    validate_export_request,
+)
 
 
 ExportScope = Literal["region", "month"]
@@ -27,24 +30,11 @@ EXPORT_FIELDS = {
 }
 AREA_FIELDS = {"areaKm2", "populationDensity"}
 CHANGE_FIELDS = {"previousMonthChange", "previousMonthChangeRate"}
-MAX_EXPORT_ROWS = 10_000
-MAX_EXPORT_MONTHS = 240
 MAX_EXPORT_REGIONS = 100
 
 
 class NoExportData(Exception):
     pass
-
-
-def _month_index(stats_ym: str) -> int:
-    if (
-        len(stats_ym) != 6
-        or not stats_ym.isascii()
-        or not stats_ym.isdigit()
-        or not 1 <= int(stats_ym[4:]) <= 12
-    ):
-        raise ValueError("기간은 유효한 YYYYMM 형식이어야 합니다.")
-    return int(stats_ym[:4]) * 12 + int(stats_ym[4:])
 
 
 def prepare_population_export(
@@ -71,7 +61,10 @@ def prepare_population_export(
             raise ValueError("선택 지역과 시작·종료월을 지정해주세요.")
         if len(selected_codes) > MAX_EXPORT_REGIONS:
             raise ValueError("한 번에 선택할 수 있는 지역 수를 초과했습니다.")
-        if any(re.fullmatch(r"\d{8,10}", code) is None for code in selected_codes):
+        if any(
+            len(code) not in (8, 10) or not code.isascii() or not code.isdigit()
+            for code in selected_codes
+        ):
             raise ValueError("지역 코드 형식이 올바르지 않습니다.")
         first_month, last_month = from_ym, to_ym
     else:
@@ -80,20 +73,26 @@ def prepare_population_export(
         first_month = last_month = stats_ym
         selected_codes = None
 
-    first_index = _month_index(first_month)
-    last_index = _month_index(last_month)
-    if first_index > last_index:
-        raise ValueError("시작월은 종료월보다 늦을 수 없습니다.")
-    if last_index - first_index + 1 > MAX_EXPORT_MONTHS:
-        raise ValueError("한 번에 최대 240개월까지 내려받을 수 있습니다.")
+    validate_export_request(
+        scope,
+        first_month if scope == "region" else None,
+        last_month if scope == "region" else None,
+        stats_ym if scope == "month" else None,
+        0,
+    )
 
     records = list_export_population(
         db, level, selected_codes, first_month, last_month, MAX_EXPORT_ROWS + 1,
     )
     if not records:
         raise NoExportData
-    if len(records) > MAX_EXPORT_ROWS:
-        raise ValueError("자료가 너무 많습니다. 기간을 줄여 다시 시도해주세요.")
+    validate_export_request(
+        scope,
+        first_month if scope == "region" else None,
+        last_month if scope == "region" else None,
+        stats_ym if scope == "month" else None,
+        len(records),
+    )
 
     previous_rows = {}
     if CHANGE_FIELDS.intersection(selected_fields):

@@ -1,0 +1,148 @@
+/* 사이트의 내보내기 창(PopulationCsvExport.css)과 같은 색과 모양을 씁니다. */
+.login-modal {
+  width: min(380px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid #cedbe7;
+  border-radius: 18px;
+  color: #233b52;
+  background: #fff;
+  box-shadow: 0 22px 70px rgb(19 46 78 / 24%);
+  font-family: Pretendard, 'Noto Sans KR', sans-serif;
+}
+
+.login-modal::backdrop {
+  background: rgb(22 40 61 / 42%);
+}
+
+.login-modal-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 340px;
+  padding: 20px 24px 22px;
+}
+
+.login-modal-body form {
+  gap: 16px;
+}
+
+.login-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.login-modal h2 {
+  margin: 0;
+  color: #183b60;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.login-modal-close {
+  border: 0;
+  padding: 3px 8px;
+  color: #61758a;
+  background: transparent;
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.login-modal p {
+  margin: 0 0 14px;
+  color: #344b60;
+  font-size: 13px;
+}
+
+.login-modal form {
+  display: grid;
+  gap: 12px;
+}
+
+.login-modal label {
+  display: grid;
+  gap: 5px;
+  color: #405a72;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.login-modal input {
+  padding: 9px 10px;
+  border: 1px solid #c5d6e6;
+  border-radius: 8px;
+  color: #263f57;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+}
+
+.login-modal input:focus-visible,
+.login-modal button:focus-visible,
+.login-modal-close:focus-visible {
+  outline: 2px solid #236bb5;
+  outline-offset: 2px;
+}
+
+.login-modal-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.login-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.login-modal-actions button {
+  border: 1px solid #b8cfe5;
+  border-radius: 9px;
+  padding: 9px 14px;
+  color: #1f5c9c;
+  background: #f2f8fe;
+  font: 700 13px Pretendard, 'Noto Sans KR', sans-serif;
+  cursor: pointer;
+}
+
+.login-modal-actions button[type='submit'] {
+  border-color: #236bb5;
+  color: #fff;
+  background: #236bb5;
+}
+
+.login-modal-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.login-modal-links {
+  margin: 0;
+  padding-top: 18px;
+  color: #61758a;
+  font-size: 12px;
+  text-align: right;
+}
+
+.login-modal-link {
+  border: 0;
+  padding: 0;
+  color: #236bb5;
+  background: transparent;
+  font: 700 12px Pretendard, 'Noto Sans KR', sans-serif;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.login-modal-notice {
+  margin: 0;
+  color: #1f6b3a;
+  font-size: 13px;
+  font-weight: 700;
+}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { DevelopmentNotice } from '../../features/development/developmentApi'
+import { officialSourceLabel } from '../../features/development/officialNoticeUrl'
 import './OfficialNoticeWindow.css'
 
 interface OfficialNoticeWindowProps {
@@ -10,31 +11,7 @@ interface OfficialNoticeWindowProps {
 }
 
 function getOfficialSourceLabel(notice: DevelopmentNotice) {
-  try {
-    const url = new URL(notice.sourceUrl)
-    if (
-      url.protocol === 'https:' &&
-      url.hostname === 'www.gimhae.go.kr' &&
-      url.pathname === '/03360/00023/00029.web' &&
-      url.searchParams.has('not_ancmt_mgt_no')
-    ) return '김해시청 원문'
-    if (
-      url.protocol === 'https:' &&
-      ['eum.go.kr', 'www.eum.go.kr'].includes(url.hostname) &&
-      url.pathname === '/web/gs/gv/gvGosiDet.jsp' &&
-      /^\d+$/.test(url.searchParams.get('seq') ?? '')
-    ) return '토지이음 원문'
-    if (
-      url.protocol === 'https:' &&
-      url.hostname === 'minwon.gyeongnam.go.kr' &&
-      url.pathname === '/citynet/jsp/sap/SAPGosiBizProcess.do' &&
-      url.searchParams.get('command') === 'searchDetail' &&
-      /^\d+$/.test(url.searchParams.get('sno') ?? '')
-    ) return '경상남도 원문'
-    return ''
-  } catch {
-    return ''
-  }
+  return officialSourceLabel(notice.sourceUrl)
 }
 
 function hasVerifiedOfficialUrl(notice: DevelopmentNotice) {

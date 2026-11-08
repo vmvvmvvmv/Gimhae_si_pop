@@ -90,3 +90,18 @@ export async function downloadPopulationExport(
   link.remove()
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
 }
+
+// 서버(export_limits.py)와 같은 값입니다. 지역별 내보내기는 최대 24개월까지만 됩니다.
+export const MAX_EXPORT_MONTHS = 24
+
+// 'YYYYMM' 형식의 통계월을 delta개월만큼 옮깁니다.
+export function shiftStatsMonth(ym: string, delta: number): string {
+  const index = Number(ym.slice(0, 4)) * 12 + (Number(ym.slice(4, 6)) - 1) + delta
+  return `${Math.floor(index / 12)}${String((index % 12) + 1).padStart(2, '0')}`
+}
+
+// 시작월과 종료월을 포함한 개월 수입니다.
+export function monthSpan(fromYm: string, toYm: string): number {
+  return (Number(toYm.slice(0, 4)) * 12 + Number(toYm.slice(4, 6))) -
+    (Number(fromYm.slice(0, 4)) * 12 + Number(fromYm.slice(4, 6))) + 1
+}

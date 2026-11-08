@@ -9,6 +9,7 @@ from sqlalchemy import select
 from .db import SessionLocal
 from .models import Region
 from .services.population_sync_service import save_local_population_result
+from .services.sync_lock import database_write_lock
 from .sync_population_history import parse_age, parse_rows, parse_summary
 
 
@@ -62,6 +63,7 @@ def build_result(
     return result, missing_count
 
 
+@database_write_lock
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="다운로드한 행정동 CSV를 SQLite에 저장합니다.",

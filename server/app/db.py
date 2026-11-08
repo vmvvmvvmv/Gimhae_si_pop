@@ -1,7 +1,7 @@
 from collections.abc import Generator
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
@@ -18,6 +18,18 @@ engine = create_engine(
     # 세션을 모든 요청이 공유한다는 뜻은 아닙니다. get_db가 요청마다 만듭니다.
     connect_args={"check_same_thread": False},
 )
+
+
+@event.listens_for(engine, "connect")
+def _configure_sqlite(dbapi_connection, _record) -> None:
+    # WAL이면 읽기와 쓰기가 서로 덜 막히고, 백업 컨테이너가 같은 파일을 읽어도 안전합니다.
+    # busy_timeout은 잠금이 풀릴 때까지 최대 10초 기다리게 합니다.
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA busy_timeout=10000")
+    cursor.close()
+
+
 SessionLocal = sessionmaker(
     bind=engine,
     autoflush=False,

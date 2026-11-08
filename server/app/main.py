@@ -14,14 +14,20 @@ from .api.density import router as density_router
 from .api.facilities import router as facilities_router
 from .api.floating_population import router as floating_population_router
 from .api.development import router as development_router
-from .core.config import CORS_ORIGINS, MOIS_SERVICE_KEY, VWORLD_API_KEY
+from .api.admin import router as admin_router
+from .api.auth import router as auth_router
+from .core.config import CORS_ORIGINS, ENABLE_API_DOCS, MOIS_SERVICE_KEY, VWORLD_API_KEY
 from .db import get_db
 from .services.deployment_service import read_deployment_readiness
+from .services.security_headers import apply_security_headers
 
 
 app = FastAPI(
     title="지역 인구 지도 API",
     version="0.1.0",
+    docs_url="/docs" if ENABLE_API_DOCS else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if ENABLE_API_DOCS else None,
 )
 logger = logging.getLogger(__name__)
 
@@ -48,19 +54,17 @@ async def sqlalchemy_exception_handler(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(CORS_ORIGINS),
-    allow_credentials=False,
-    allow_methods=["GET"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
     allow_headers=["Accept", "Content-Type"],
+    expose_headers=["Retry-After"],
 )
 
 
 @app.middleware("http")
 async def add_security_headers(request, call_next):
     response = await call_next(request)
-    response.headers.setdefault("X-Content-Type-Options", "nosniff")
-    response.headers.setdefault("X-Frame-Options", "DENY")
-    response.headers.setdefault("Referrer-Policy", "no-referrer")
-    return response
+    return apply_security_headers(response)
 
 app.include_router(population_router)
 app.include_router(national_population_router)
@@ -68,6 +72,8 @@ app.include_router(density_router)
 app.include_router(facilities_router)
 app.include_router(floating_population_router)
 app.include_router(development_router)
+app.include_router(admin_router)
+app.include_router(auth_router)
 
 
 @app.get("/api/health")
@@ -103,6 +109,9 @@ ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable"
 @app.get("/{requested_path:path}", include_in_schema=False)
 def serve_frontend(requested_path: str):
     if requested_path == "api" or requested_path.startswith("api/"):
+        raise HTTPException(status_code=404)
+    # docs/ 는 내부 기획·배포 문서입니다. 웹으로는 어떤 경로도 열지 않습니다.
+    if requested_path == "docs" or requested_path.startswith("docs/"):
         raise HTTPException(status_code=404)
 
     file_path = (FRONTEND_DIR / requested_path).resolve()

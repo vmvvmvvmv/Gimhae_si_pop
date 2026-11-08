@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { installOfficialNoticeLinkHandler, officialSourceLabel } from '../../features/development/officialNoticeUrl'
 import {
   getRegionCode,
   getRegionName,
@@ -162,9 +163,9 @@ function renderDevelopmentNotices(notices: DevelopmentNotice[]): string {
     '<div class="development-notice-list">' +
       notices
         .map((notice) => {
-          const title = notice.sourceUrl
+          const title = officialSourceLabel(notice.sourceUrl)
             ? `<a class="development-notice-title" href="${escapeHtml(notice.sourceUrl)}" ` +
-              'onclick="window.open(this.href,\'OfficialNotice\',\'width=1200,height=850,scrollbars=yes,resizable=yes\'); return false;">' +
+              `data-official-url="${escapeHtml(notice.sourceUrl)}" target="_blank" rel="noopener noreferrer">` +
               `${escapeHtml(notice.title)}</a>`
             : `<strong class="development-notice-title is-unlinked">${escapeHtml(notice.title)}</strong>`
           let linkStatus = notice.officialLinkStatusLabel
@@ -859,6 +860,7 @@ export default function NaverMap({
           pixelOffset: new window.naver.maps.Point(0, -12),
         })
         developmentInfoWindowRef.current = developmentInfoWindow
+        installOfficialNoticeLinkHandler()
 
         dataLayer.addListener('click', (event: NaverDataPointerEvent) => {
           // 경계·도로·개발구역이 한 Data 레이어에 있으므로 종류를 먼저 구분합니다.
