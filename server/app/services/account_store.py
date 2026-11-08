@@ -128,6 +128,14 @@ class AccountStore:
                     (password_hash, username),
                 )
 
+    def rename(self, username: str, new_username: str) -> None:
+        """이미 있는 아이디(대소문자 무시)로 바꾸면 sqlite3.IntegrityError를 냅니다."""
+        with self._connect() as db:
+            db.execute(
+                "UPDATE accounts SET username = ? WHERE username = ?",
+                (normalize_username(new_username), normalize_username(username)),
+            )
+
     def set_active(self, username: str, active: bool) -> None:
         """마지막 활성 관리자는 비활성화할 수 없습니다.
 

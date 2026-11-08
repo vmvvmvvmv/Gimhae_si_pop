@@ -87,6 +87,19 @@
   outline-offset: 2px;
 }
 
+.login-modal label.login-modal-remember {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+.login-modal-remember input {
+  width: auto;
+  padding: 0;
+  accent-color: #236bb5;
+}
+
 .login-modal-error {
   margin: 0;
   color: #b42318;
@@ -145,4 +158,11 @@
   color: #1f6b3a;
   font-size: 13px;
   font-weight: 700;
+}
+
+/* 로그인 창과 같은 폼을 페이지로 보여 줄 때 씁니다. */
+.auth-standalone {
+  box-sizing: border-box;
+  margin: 48px auto;
+  box-shadow: 0 22px 70px rgb(19 46 78 / 12%);
 }

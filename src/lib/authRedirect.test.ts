@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createLoginRetryFetch, isAuthEndpoint, loginUrlFor, safeNextPath } from './authRedirect'
+import { createLoginRetryFetch, isNoPromptEndpoint, loginUrlFor, safeNextPath } from './authRedirect'
 
 describe('safeNextPath', () => {
   it('keeps same-site paths', () => {
@@ -25,9 +25,11 @@ describe('login helpers', () => {
   })
 
   it('treats login and session endpoints as non-prompting', () => {
-    expect(isAuthEndpoint('/api/admin/session')).toBe(true)
-    expect(isAuthEndpoint('/api/admin/login')).toBe(true)
-    expect(isAuthEndpoint('/api/population/export.csv')).toBe(false)
+    expect(isNoPromptEndpoint('/api/admin/session')).toBe(true)
+    expect(isNoPromptEndpoint('/api/admin/login')).toBe(true)
+    expect(isNoPromptEndpoint('/api/population/availability')).toBe(true)
+    expect(isNoPromptEndpoint('/api/population/export.csv')).toBe(false)
+    expect(isNoPromptEndpoint('/api/population/regions?year=2026')).toBe(false)
   })
 })
 

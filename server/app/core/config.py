@@ -59,6 +59,11 @@ try:
     ADMIN_SESSION_IDLE_SECONDS = int(os.getenv("ADMIN_SESSION_IDLE_SECONDS", "1800"))
 except ValueError:
     ADMIN_SESSION_IDLE_SECONDS = 1800
+# 로그인 유지 세션은 로그아웃할 때까지 유지합니다. 400일은 Chrome이 쿠키에 허용하는 최대 기간입니다.
+try:
+    ADMIN_SESSION_REMEMBER_SECONDS = int(os.getenv("ADMIN_SESSION_REMEMBER_SECONDS", str(400 * 24 * 60 * 60)))
+except ValueError:
+    ADMIN_SESSION_REMEMBER_SECONDS = 400 * 24 * 60 * 60
 ADMIN_COOKIE_SECURE = _parse_bool(
     os.getenv("ADMIN_COOKIE_SECURE"),
     default=False,
