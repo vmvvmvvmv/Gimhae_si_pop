@@ -159,3 +159,10 @@
   font-size: 13px;
   font-weight: 700;
 }
+
+/* 로그인 창과 같은 폼을 페이지로 보여 줄 때 씁니다. */
+.auth-standalone {
+  box-sizing: border-box;
+  margin: 48px auto;
+  box-shadow: 0 22px 70px rgb(19 46 78 / 12%);
+}

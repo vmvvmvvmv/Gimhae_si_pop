@@ -4,9 +4,11 @@ import GisDataLink from './GisDataLink'
 
 export type SidePanelView = 'region' | 'development' | 'facility'
 
-export default function DashboardRail({ sidePanelView, onShowRegion, onOpenGuide }: {
+export default function DashboardRail({ sidePanelView, onShowRegion, onShowDevelopment, onShowFacility, onOpenGuide }: {
   sidePanelView: SidePanelView
   onShowRegion: () => void
+  onShowDevelopment: () => void
+  onShowFacility: () => void
   onOpenGuide: () => void
 }) {
   return (
@@ -27,22 +29,24 @@ export default function DashboardRail({ sidePanelView, onShowRegion, onOpenGuide
           <DashboardRailIcon name="detail" />
           지역 정보
         </a>
-        <div
+        <button
+          type="button"
           className={`rail-status-item ${sidePanelView === 'development' ? 'active' : ''}`}
           aria-current={sidePanelView === 'development' ? 'true' : undefined}
-          title="지도에서 개발구역 경계를 선택하면 자동으로 열립니다."
+          onClick={onShowDevelopment}
         >
           <DashboardRailIcon name="development" />
           개발계획
-        </div>
-        <div
+        </button>
+        <button
+          type="button"
           className={`rail-status-item ${sidePanelView === 'facility' ? 'active' : ''}`}
           aria-current={sidePanelView === 'facility' ? 'true' : undefined}
-          title="지도에서 시설 마커를 선택하면 자동으로 열립니다."
+          onClick={onShowFacility}
         >
           <DashboardRailIcon name="facility" />
           주요 시설
-        </div>
+        </button>
         <GisDataLink>
           <DashboardRailIcon name="layers" />
           GIS 자료

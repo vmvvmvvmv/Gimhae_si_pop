@@ -4,8 +4,6 @@ import DashboardPage from '../pages/DashboardPage'
 
 // 대시보드 말고는 처음 방문할 때 필요 없으므로 필요한 순간에만 내려받습니다.
 const LoginPage = lazy(() => import('../pages/LoginPage'))
-const SignupPage = lazy(() => import('../pages/SignupPage'))
-const PasswordResetPage = lazy(() => import('../pages/PasswordResetPage'))
 const AdminPage = lazy(() => import('../pages/AdminPage'))
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'))
 // 목업은 개발할 때만 보입니다. 운영 빌드에서는 NotFound로 처리됩니다.
@@ -22,8 +20,8 @@ export function AppRouter() {
           <Route path="/" element={<DashboardPage />} />
           {SHOW_DEV_PAGES && <Route path="/ui-concept" element={<MapServiceMockupPage />} />}
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
-          <Route path="/password-reset" element={<PasswordResetPage />} />
+          <Route path="/signup" element={<LoginPage initialMode="signup" />} />
+          <Route path="/password-reset" element={<LoginPage initialMode="reset-request" />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/report-figures" element={<ReportFiguresPage />} />
           <Route path="*" element={<NotFoundPage />} />

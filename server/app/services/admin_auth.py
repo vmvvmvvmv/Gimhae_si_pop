@@ -179,17 +179,18 @@ def read_session(value: str | None, now: int | None = None) -> AdminSession | No
     stored = SESSION_STORE.get(sid)
     if stored is None or normalize_username(stored[0]) != normalize_username(username):
         return None
-    remember = stored[3]
+    # 역할과 활성 여부는 요청마다 계정 기록에서 다시 읽어서, 변경이 바로 반영되게 합니다.
+    account = ACCOUNT_STORE.get(username)
+    if account is None or not account.is_active:
+        return None
+    # 로그인 유지는 일반 계정에만 적용합니다. 유지 중에 관리자가 되면 바로 일반 세션 규칙을 따릅니다.
+    remember = stored[3] and account.role != "admin"
     if current_time - issued_at >= (ADMIN_SESSION_REMEMBER_SECONDS if remember else ADMIN_SESSION_TTL_SECONDS):
         return None
     last_seen = stored[2] or issued_at
     # 로그인 유지를 고른 세션에는 미사용 자동 로그아웃을 적용하지 않습니다.
     if not remember and current_time - last_seen >= ADMIN_SESSION_IDLE_SECONDS:
         SESSION_STORE.revoke(sid)
-        return None
-    # 역할과 활성 여부는 요청마다 계정 기록에서 다시 읽어서, 변경이 바로 반영되게 합니다.
-    account = ACCOUNT_STORE.get(username)
-    if account is None or not account.is_active:
         return None
     # 비밀번호가 바뀌었으면 발급 당시의 지문과 달라져서 옛 세션은 거부됩니다.
     if not hmac.compare_digest(stored[1], password_fingerprint(account.password_hash)):

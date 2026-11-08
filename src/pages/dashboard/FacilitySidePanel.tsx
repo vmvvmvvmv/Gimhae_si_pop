@@ -57,6 +57,9 @@ export default function FacilitySidePanel({ selectedFacility }: { selectedFacili
           </figcaption>
         </figure>
       )}
+      {!selectedFacility && (
+        <p className="detail-help">지도에서 시설 마커를 선택하면 상세 정보를 볼 수 있습니다.</p>
+      )}
       <div className="layer-description-list">
         {selectedFacility && (
           <article className="selected-map-description facility-contact-description">

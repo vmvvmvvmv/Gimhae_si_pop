@@ -91,7 +91,9 @@ def admin_login(payload: LoginRequest, response: Response, request: Request) -> 
         )
     login_limiter.clear(client_key)
     login_limiter.clear(account_key)
-    audit_log.record(login_name, "login_success", "로그인 유지" if payload.remember else None, client_ip)
+    # 관리자 쿠키가 유출되면 피해가 가장 크므로 로그인 유지를 적용하지 않습니다.
+    remember = payload.remember and account.role != "admin"
+    audit_log.record(login_name, "login_success", "로그인 유지" if remember else None, client_ip)
 
     from ..services.admin_auth import issue_session, password_fingerprint, set_session_cookie
 
@@ -101,9 +103,9 @@ def admin_login(payload: LoginRequest, response: Response, request: Request) -> 
         issue_session(
             payload.username,
             pwd_fp=password_fingerprint(account.password_hash),
-            remember=payload.remember,
+            remember=remember,
         ),
-        payload.remember,
+        remember,
     )
     return {"status": "ok"}
 

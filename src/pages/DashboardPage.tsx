@@ -411,6 +411,16 @@ export default function DashboardPage() {
           setSidePanelView('region')
           setIsSidePanelCollapsed(false)
         }}
+        onShowDevelopment={() => {
+          setSidePanelView('development')
+          setIsSidePanelCollapsed(false)
+          // 패널을 열어도 지도에 구역이 없으면 고를 수가 없으므로 함께 켭니다.
+          setShowDevelopmentAreas(true)
+        }}
+        onShowFacility={() => {
+          setSidePanelView('facility')
+          setIsSidePanelCollapsed(false)
+        }}
         onOpenGuide={openWelcomeGuide}
       />
 

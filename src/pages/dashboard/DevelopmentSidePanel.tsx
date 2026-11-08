@@ -46,6 +46,9 @@ export default function DevelopmentSidePanel({ selectedDevelopmentAreas, notices
           </figcaption>
         </figure>
       )}
+      {selectedDevelopmentAreas.length === 0 && (
+        <p className="detail-help">지도에서 개발구역을 선택하면 관련 고시를 볼 수 있습니다.</p>
+      )}
       <div className="layer-description-list">
         {selectedDevelopmentAreas.map((area) => (
           <article className="selected-map-description" key={area.sourceId || `${area.category}-${area.name}`}>

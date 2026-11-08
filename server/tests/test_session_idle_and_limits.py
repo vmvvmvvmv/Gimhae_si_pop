@@ -74,6 +74,26 @@ class RememberSessionTests(IdleSessionTests):
         self.assertIsNotNone(self.sessions.get("old-remember"))
         self.assertIsNone(self.sessions.get("old-normal"))
 
+    def test_admin_session_never_gets_the_long_lifetime(self):
+        self.accounts.create("boss", hash_password("long-enough-password"), "admin")
+        with patch("app.services.admin_auth.ADMIN_SESSION_REMEMBER_SECONDS", 100_000):
+            value = issue_session("boss", issued_at=1000, remember=True)
+            self.assertIsNone(read_session(value, now=1000 + 50_000))
+
+    def test_admin_login_ignores_the_checkbox(self):
+        self.accounts.create("boss", hash_password("long-enough-password"), "admin")
+        request = Request({"type": "http", "client": ("10.0.2.1", 1234), "headers": []})
+        response = Response()
+        with tempfile.TemporaryDirectory() as directory:
+            limiter = LoginRateLimiter(Path(directory) / "attempts.db")
+            with patch("app.services.audit_log.AUDIT_STORE"), \
+                 patch("app.api.admin.login_limiter", limiter), \
+                 patch("app.api.admin.ADMIN_SESSION_SECRET", "secret"), \
+                 patch("app.api.admin.admin_auth_configured", return_value=True), \
+                 patch("app.api.admin.authenticate_account", return_value=self.accounts.get("boss")):
+                admin_login(LoginRequest(username="boss", password="x", remember=True), response, request)
+        self.assertNotIn("max-age", response.headers["set-cookie"].lower())
+
     def test_cookie_lifetime_follows_the_checkbox(self):
         request = Request({"type": "http", "client": ("10.0.2.1", 1234), "headers": []})
         cookies = {}
