@@ -130,9 +130,9 @@ class AccountApiTests(unittest.TestCase):
     def login_as(self, username: str) -> None:
         self.client.cookies.set(SESSION_COOKIE_NAME, issue_session(username))
 
-    def test_landing_data_is_public_but_features_require_login(self):
+    def test_population_data_and_features_require_login_by_default(self):
         self.assertEqual(self.client.get("/api/health").status_code, 200)
-        self.assertEqual(self.client.get("/api/population/availability").status_code, 200)
+        self.assertEqual(self.client.get("/api/population/availability").status_code, 401)
         self.assertEqual(self.client.get("/api/facilities").status_code, 200)
         self.assertEqual(self.client.get("/api/population/export.csv",
                                          params={"scope": "month", "stats_ym": "202608",

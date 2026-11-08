@@ -26,8 +26,8 @@ server/.venv/
 # 환경 변수와 API 키
 .env
 .env.*
-!.env.example
 deploy.env
+deploy.example.env
 
 # 작업 중 임시 산출물과 개인 문서는 저장소에 올리지 않습니다.
 .docx_work/

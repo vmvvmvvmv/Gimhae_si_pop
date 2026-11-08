@@ -50,9 +50,13 @@ class PopulationAccessTests(unittest.TestCase):
         self.addCleanup(self.client.close)
         self.session_value = issue_session("kim")
 
-    def test_public_by_default(self):
+    def test_public_when_setting_is_off(self):
         with patch("app.api.population.REQUIRE_LOGIN_FOR_POPULATION_DATA", False):
             self.assertNotEqual(self.client.get(ENDPOINT).status_code, 401)
+
+    def test_private_when_setting_is_unset(self):
+        from app.core.config import _parse_bool
+        self.assertTrue(_parse_bool(None, default=True))
 
     def test_login_required_when_configured(self):
         with patch("app.api.population.REQUIRE_LOGIN_FOR_POPULATION_DATA", True):
