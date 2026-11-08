@@ -110,6 +110,9 @@ ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable"
 def serve_frontend(requested_path: str):
     if requested_path == "api" or requested_path.startswith("api/"):
         raise HTTPException(status_code=404)
+    # docs/ 는 내부 기획·배포 문서입니다. 웹으로는 어떤 경로도 열지 않습니다.
+    if requested_path == "docs" or requested_path.startswith("docs/"):
+        raise HTTPException(status_code=404)
 
     file_path = (FRONTEND_DIR / requested_path).resolve()
     try:

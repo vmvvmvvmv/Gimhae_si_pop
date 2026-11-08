@@ -12,6 +12,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db import Base, get_db
 from app.main import app
+from app.services.audit_log import AuditStore
 from app.services.account_store import AccountStore, LastAdminError
 from app.services.admin_auth import (
     SESSION_COOKIE_NAME,
@@ -106,6 +107,7 @@ class AccountApiTests(unittest.TestCase):
         self.addCleanup(app.dependency_overrides.clear)
         # 저장소 객체는 모듈 import 시점에 이름으로 묶이므로, 쓰는 모듈마다 모두 바꿉니다.
         targets = [
+            ("app.services.audit_log.AUDIT_STORE", AuditStore(root / "audit.db")),
             ("app.services.admin_auth.ACCOUNT_STORE", self.accounts),
             ("app.api.admin.ACCOUNT_STORE", self.accounts),
             ("app.services.admin_auth.SESSION_STORE", self.sessions),

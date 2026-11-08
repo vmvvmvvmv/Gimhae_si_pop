@@ -142,5 +142,59 @@ class BackupDatabaseTests(unittest.TestCase):
             self.assertEqual(len(backups), 1)
             verify_restore(backups[0])
 
+    def _sample_db(self, path, value):
+        with closing(sqlite3.connect(path)) as db:
+            with db:
+                db.execute("create table sample (value text)")
+                db.execute("insert into sample values (?)", (value,))
+
+    def test_daily_backup_includes_accounts_and_audit_with_own_retention(self):
+        kst = timezone(timedelta(hours=9))
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
+            root = Path(directory)
+            source = root / "source.db"
+            self._sample_db(source, "population")
+            self._sample_db(root / "admin_accounts.db", "accounts")
+            self._sample_db(root / "admin_audit.db", "audit")
+            backup_dir = root / "backups"
+            backup_dir.mkdir()
+            old_accounts = backup_dir / "admin_accounts_daily_20261027_030000.db"
+            old_population = backup_dir / "gimhae_population_daily_20261027_030000.db"
+            for path in (old_accounts, old_population):
+                path.write_bytes(b"old backup")
+
+            with patch("app.backup_database.DATABASE_PATH", source), \
+                 patch("app.backup_database.DATA_DIR", root):
+                backup_daily_once(keep=1, now=datetime(2026, 10, 30, 3, 0, tzinfo=kst))
+
+            self.assertFalse(old_accounts.exists())
+            self.assertFalse(old_population.exists())
+            for prefix, value in (
+                ("gimhae_population", "population"),
+                ("admin_accounts", "accounts"),
+                ("admin_audit", "audit"),
+            ):
+                backup = backup_dir / f"{prefix}_daily_20261030_030000.db"
+                verify_restore(backup)
+                with closing(sqlite3.connect(backup)) as db:
+                    self.assertEqual(db.execute("select value from sample").fetchone(), (value,))
+
+    def test_population_backup_survives_a_broken_accounts_file(self):
+        kst = timezone(timedelta(hours=9))
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
+            root = Path(directory)
+            source = root / "source.db"
+            self._sample_db(source, "population")
+            (root / "admin_accounts.db").write_bytes(b"not a sqlite database")
+
+            with patch("app.backup_database.DATABASE_PATH", source), \
+                 patch("app.backup_database.DATA_DIR", root):
+                with self.assertRaises(sqlite3.DatabaseError):
+                    backup_daily_once(now=datetime(2026, 10, 30, 3, 0, tzinfo=kst))
+
+            backups = root / "backups"
+            self.assertTrue((backups / "gimhae_population_daily_20261030_030000.db").exists())
+            self.assertFalse((backups / "admin_accounts_daily_20261030_030000.db").exists())
+
 if __name__ == "__main__":
     unittest.main()

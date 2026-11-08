@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Iterator
 
 from ..db import DATA_DIR
+from .account_store import normalize_username
 
 
 SESSIONS_PATH = DATA_DIR / "admin_sessions.db"
@@ -33,6 +34,8 @@ class AdminSessionStore:
             if "pwd_fp" not in columns:
                 # 이전 버전에서 만든 DB에는 열이 없으므로 추가합니다. 빈 값 세션은 다음 검사에서 거부됩니다.
                 db.execute("ALTER TABLE admin_sessions ADD COLUMN pwd_fp TEXT NOT NULL DEFAULT ''")
+            # 대문자로 저장된 예전 세션도 계정별 로그아웃 대상이 되게 맞춥니다.
+            db.execute("UPDATE admin_sessions SET username = lower(username) WHERE username <> lower(username)")
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -53,7 +56,7 @@ class AdminSessionStore:
             )
             db.execute(
                 "INSERT INTO admin_sessions (sid, username, issued_at, pwd_fp) VALUES (?, ?, ?, ?)",
-                (sid, username, issued_at, pwd_fp),
+                (sid, normalize_username(username), issued_at, pwd_fp),
             )
 
     def get(self, sid: str) -> tuple[str, str] | None:
@@ -77,11 +80,11 @@ class AdminSessionStore:
 
     def revoke_user(self, username: str) -> None:
         with self._connect() as db:
-            db.execute("DELETE FROM admin_sessions WHERE username = ?", (username,))
+            db.execute("DELETE FROM admin_sessions WHERE username = ?", (normalize_username(username),))
 
     def revoke_user_except(self, username: str, keep_sid: str) -> None:
         with self._connect() as db:
             db.execute(
                 "DELETE FROM admin_sessions WHERE username = ? AND sid <> ?",
-                (username, keep_sid),
+                (normalize_username(username), keep_sid),
             )

@@ -14,7 +14,7 @@ from ..core.config import (
     ADMIN_USERNAME,
 )
 from .account_requests import AccountRequestStore
-from .account_store import AccountStore
+from .account_store import AccountStore, normalize_username
 from .admin_session_store import AdminSessionStore
 
 SESSION_COOKIE_NAME = "gimhae_admin_session"
@@ -119,6 +119,8 @@ def require_admin(request: Request) -> AdminSession:
 
 def issue_session(username: str, issued_at: int | None = None,
                   pwd_fp: str | None = None) -> str:
+    # 입력한 대소문자 그대로 세션에 넣으면 본인 확인 비교가 어긋나므로 저장 형태로 맞춥니다.
+    username = normalize_username(username)
     timestamp = issued_at or int(time.time())
     if pwd_fp is None:
         account = ACCOUNT_STORE.get(username)
@@ -171,7 +173,7 @@ def read_session(value: str | None, now: int | None = None) -> AdminSession | No
         return None
     # 로그아웃·비활성화로 지워진 세션은 거부합니다.
     stored = SESSION_STORE.get(sid)
-    if stored is None or stored[0] != username:
+    if stored is None or normalize_username(stored[0]) != normalize_username(username):
         return None
     # 역할과 활성 여부는 요청마다 계정 기록에서 다시 읽어서, 변경이 바로 반영되게 합니다.
     account = ACCOUNT_STORE.get(username)
@@ -180,7 +182,7 @@ def read_session(value: str | None, now: int | None = None) -> AdminSession | No
     # 비밀번호가 바뀌었으면 발급 당시의 지문과 달라져서 옛 세션은 거부됩니다.
     if not hmac.compare_digest(stored[1], password_fingerprint(account.password_hash)):
         return None
-    return AdminSession(username=username, role=account.role, issued_at=issued_at)
+    return AdminSession(username=account.username, role=account.role, issued_at=issued_at)
 
 
 def session_id(value: str | None) -> str | None:

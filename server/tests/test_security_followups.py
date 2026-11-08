@@ -97,7 +97,8 @@ class DocsAndRecoveryTests(unittest.TestCase):
             accounts = AccountStore(root / "accounts.db")
             sessions = AdminSessionStore(root / "sessions.db")
             accounts.create("root", hash_password("old-password-1"), "admin")
-            with patch("app.services.admin_auth.ACCOUNT_STORE", accounts), \
+            with patch("app.services.audit_log.AUDIT_STORE"), \
+                 patch("app.services.admin_auth.ACCOUNT_STORE", accounts), \
                  patch("app.services.admin_auth.SESSION_STORE", sessions), \
                  patch("app.services.admin_auth.ADMIN_SESSION_SECRET", "secret"), \
                  patch("app.services.admin_auth.ADMIN_USERNAME", "root"), \
@@ -123,3 +124,10 @@ class DocsAndRecoveryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DocsPathBlockTests(unittest.TestCase):
+    def test_docs_paths_are_never_served(self):
+        client = TestClient(app)
+        for path in ("/docs/architecture.md", "/docs/project-handoff.md", "/docs"):
+            self.assertEqual(client.get(path).status_code, 404, path)

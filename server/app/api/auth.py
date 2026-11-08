@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field
 
 from ..core.config import ADMIN_SESSION_SECRET
 from ..db import DATA_DIR
+from ..services import audit_log
+from ..services.account_store import normalize_username
 from ..services.admin_auth import (
     ACCOUNT_REQUESTS,
     ACCOUNT_STORE,
@@ -79,11 +81,15 @@ def signup(payload: SignupRequest, request: Request) -> dict[str, str]:
 
 @router.post("/password-reset/request", status_code=status.HTTP_202_ACCEPTED)
 def request_password_reset(payload: ResetRequest, request: Request) -> dict[str, str]:
-    """계정 존재 여부를 드러내지 않도록 응답은 항상 같습니다."""
+    """먼저 계정이 있는지 확인합니다. 없거나 비활성이면 요청을 만들지 않고 404를 돌려줍니다.
+
+    참고: 이 응답으로 아이디 존재 여부를 알 수 있습니다(아이디 노출). 대신 사용자가 오타를 바로 알 수 있습니다.
+    """
     _rate_limit(request)
     account = ACCOUNT_STORE.get(payload.username)
-    if account is not None and account.is_active:
-        ACCOUNT_REQUESTS.add_reset(payload.username)
+    if account is None or not account.is_active:
+        raise HTTPException(status_code=404, detail="해당 아이디의 계정을 찾을 수 없습니다.")
+    ACCOUNT_REQUESTS.add_reset(payload.username)
     return {"status": "received"}
 
 
@@ -98,6 +104,10 @@ def confirm_password_reset(payload: ResetConfirmRequest, request: Request) -> di
     ACCOUNT_STORE.update(payload.username, password_hash=hash_password(payload.new_password))
     ACCOUNT_REQUESTS.reject("reset", payload.username)
     SESSION_STORE.revoke_user(payload.username)
+    audit_log.record(
+        normalize_username(payload.username), "password_reset_completed",
+        ip=request.client.host if request.client else "unknown",
+    )
     return {"status": "ok"}
 
 
@@ -118,4 +128,8 @@ def change_own_password(
     keep_sid = session_id(request.cookies.get(SESSION_COOKIE_NAME)) or ""
     SESSION_STORE.revoke_user_except(session.username, keep_sid)
     SESSION_STORE.set_fingerprint(keep_sid, password_fingerprint(new_hash))
+    audit_log.record(
+        session.username, "password_changed",
+        ip=request.client.host if request.client else "unknown",
+    )
     return {"status": "ok"}

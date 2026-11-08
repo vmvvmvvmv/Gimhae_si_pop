@@ -1,6 +1,7 @@
 """회원가입 신청과 비밀번호 재설정 요청을 저장합니다.
 
 두 종류 모두 관리자가 승인하기 전에는 계정에 아무 영향도 주지 않습니다.
+아이디는 계정 저장소와 같은 규칙(소문자)으로 저장합니다.
 """
 
 import hashlib
@@ -13,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
 
-from .account_store import ACCOUNTS_PATH
+from .account_store import ACCOUNTS_PATH, normalize_username
 
 
 SIGNUP = "signup"
@@ -54,6 +55,15 @@ class AccountRequestStore:
                     PRIMARY KEY (kind, username)
                 )
             """)
+            try:
+                db.execute(
+                    "UPDATE account_requests SET username = lower(username) "
+                    "WHERE username <> lower(username)"
+                )
+            except sqlite3.IntegrityError as error:
+                raise RuntimeError(
+                    "대소문자만 다른 중복 요청이 있어서 시작할 수 없습니다. 정리한 뒤 다시 실행하세요."
+                ) from error
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -73,13 +83,13 @@ class AccountRequestStore:
         )
 
     def add_signup(self, username: str, password_hash: str) -> None:
-        """같은 아이디로 대기 중인 신청이 있으면 sqlite3.IntegrityError를 냅니다."""
+        """같은 아이디(대소문자 무시)로 대기 중인 신청이 있으면 sqlite3.IntegrityError를 냅니다."""
         with self._connect() as db:
             self._prune(db)
             db.execute(
                 "INSERT INTO account_requests (kind, username, password_hash, created_at) "
                 "VALUES (?, ?, ?, ?)",
-                (SIGNUP, username, password_hash, int(time.time())),
+                (SIGNUP, normalize_username(username), password_hash, int(time.time())),
             )
 
     def add_reset(self, username: str) -> None:
@@ -89,7 +99,7 @@ class AccountRequestStore:
             db.execute(
                 "INSERT OR IGNORE INTO account_requests (kind, username, created_at) "
                 "VALUES (?, ?, ?)",
-                (RESET, username, int(time.time())),
+                (RESET, normalize_username(username), int(time.time())),
             )
 
     def list(self, kind: str) -> list[AccountRequest]:
@@ -112,6 +122,7 @@ class AccountRequestStore:
 
     def take_signup(self, username: str) -> str | None:
         """신청을 한 번만 꺼냅니다. 두 번 승인해도 두 번째는 None을 받습니다."""
+        username = normalize_username(username)
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute(
@@ -130,7 +141,7 @@ class AccountRequestStore:
         with self._connect() as db:
             cursor = db.execute(
                 "DELETE FROM account_requests WHERE kind = ? AND username = ?",
-                (kind, username),
+                (kind, normalize_username(username)),
             )
             return cursor.rowcount > 0
 
@@ -138,7 +149,7 @@ class AccountRequestStore:
         with self._connect() as db:
             return db.execute(
                 "SELECT 1 FROM account_requests WHERE kind = ? AND username = ?",
-                (kind, username),
+                (kind, normalize_username(username)),
             ).fetchone() is not None
 
     def issue_reset_code(self, username: str) -> str | None:
@@ -154,7 +165,7 @@ class AccountRequestStore:
                     _code_digest(code),
                     int(time.time()) + RESET_CODE_TTL_SECONDS,
                     RESET,
-                    username,
+                    normalize_username(username),
                 ),
             )
             return code if cursor.rowcount == 1 else None
@@ -168,6 +179,6 @@ class AccountRequestStore:
             cursor = db.execute(
                 "UPDATE account_requests SET code_hash = NULL, expires_at = NULL "
                 "WHERE kind = ? AND username = ? AND code_hash = ? AND expires_at > ?",
-                (RESET, username, _code_digest(code), int(time.time())),
+                (RESET, normalize_username(username), _code_digest(code), int(time.time())),
             )
             return cursor.rowcount == 1

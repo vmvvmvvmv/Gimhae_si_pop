@@ -15,7 +15,8 @@ from .db import DATA_DIR, DATABASE_PATH
 
 
 KST = timezone(timedelta(hours=9))
-DAILY_BACKUP_NAME = re.compile(r"gimhae_population_daily_\d{8}_\d{6}\.db")
+# 인구 DB와 함께 매일 백업할 파일입니다. 로그인 세션과 시도 횟수는 잃어도 되므로 넣지 않습니다.
+EXTRA_DAILY_DATABASES = ("admin_accounts", "admin_audit")
 
 
 def verify_restore(backup_path: Path) -> None:
@@ -31,9 +32,10 @@ def verify_restore(backup_path: Path) -> None:
                     raise sqlite3.DatabaseError(f"복구 DB 무결성 검사 실패: {result}")
 
 
-def backup_database(destination: Path | None = None) -> Path:
-    if not DATABASE_PATH.exists():
-        raise FileNotFoundError(f"DB를 찾을 수 없습니다: {DATABASE_PATH}")
+def backup_database(destination: Path | None = None, source_path: Path | None = None) -> Path:
+    source_path = source_path or DATABASE_PATH
+    if not source_path.exists():
+        raise FileNotFoundError(f"DB를 찾을 수 없습니다: {source_path}")
 
     target = destination or (
         DATA_DIR
@@ -47,7 +49,7 @@ def backup_database(destination: Path | None = None) -> Path:
     # 임시 백업의 실제 복구 검증이 끝난 뒤에만 최종 경로에 저장합니다.
     with TemporaryDirectory(prefix=".gimhae-backup-", dir=target.parent) as directory:
         candidate = Path(directory) / "candidate.db"
-        with closing(sqlite3.connect(DATABASE_PATH.resolve().as_uri() + "?mode=ro", uri=True)) as source:
+        with closing(sqlite3.connect(source_path.resolve().as_uri() + "?mode=ro", uri=True)) as source:
             with closing(sqlite3.connect(candidate)) as backup:
                 source.backup(backup)
                 backup.commit()
@@ -64,12 +66,22 @@ def backup_daily_once(keep: int = 14, now: datetime | None = None) -> Path:
     if keep < 1:
         raise ValueError("백업 보관 개수는 1 이상이어야 합니다.")
     current = (now or datetime.now(KST)).astimezone(KST)
+    # 인구 DB를 먼저 끝냅니다. 뒤의 파일이 실패해도 인구 DB 백업은 남고, 호출자가 재시도합니다.
+    result = _backup_daily_file(DATABASE_PATH, "gimhae_population", current, keep)
+    for name in EXTRA_DAILY_DATABASES:
+        source = DATA_DIR / f"{name}.db"
+        if source.exists():  # 앱을 한 번도 실행하지 않았으면 아직 파일이 없습니다.
+            _backup_daily_file(source, name, current, keep)
+    return result
+
+
+def _backup_daily_file(source: Path, prefix: str, current: datetime, keep: int) -> Path:
     directory = DATA_DIR / "backups"
-    target = directory / f"gimhae_population_daily_{current:%Y%m%d_%H%M%S}.db"
-    result = backup_database(target)
+    result = backup_database(directory / f"{prefix}_daily_{current:%Y%m%d_%H%M%S}.db", source)
+    daily_name = re.compile(re.escape(prefix) + r"_daily_\d{8}_\d{6}\.db")
     daily_files = sorted(
         (path for path in directory.iterdir()
-         if path.is_file() and DAILY_BACKUP_NAME.fullmatch(path.name)),
+         if path.is_file() and daily_name.fullmatch(path.name)),
         key=lambda path: path.name,
         reverse=True,
     )

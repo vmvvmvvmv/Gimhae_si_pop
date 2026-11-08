@@ -41,6 +41,8 @@ ENABLE_LIVE_MOIS_PROXY = _parse_bool(
 )
 # API 문서(/docs, /openapi.json)는 운영에서 숨깁니다. 필요할 때만 true로 켭니다.
 ENABLE_API_DOCS = _parse_bool(os.getenv("ENABLE_API_DOCS"))
+# 지역 인구 조회(지도 화면이 쓰는 데이터)를 로그인해야만 볼 수 있게 할지 정합니다. 기본값은 공개입니다.
+REQUIRE_LOGIN_FOR_POPULATION_DATA = _parse_bool(os.getenv("REQUIRE_LOGIN_FOR_POPULATION_DATA"))
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "").strip()
 ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH", "").strip()
 ADMIN_SESSION_SECRET = os.getenv("ADMIN_SESSION_SECRET", "").strip()

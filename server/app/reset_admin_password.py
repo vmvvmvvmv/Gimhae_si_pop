@@ -12,6 +12,8 @@ import argparse
 import getpass
 import sys
 
+from .services import audit_log
+from .services.account_store import normalize_username
 from .services.admin_auth import ACCOUNT_STORE, SESSION_STORE, hash_password
 
 MIN_PASSWORD_LENGTH = 10
@@ -23,6 +25,7 @@ def restore_admin(username: str, password: str) -> None:
     ACCOUNT_STORE.force_admin(username, hash_password(password))
     # 이전 비밀번호로 만든 로그인은 모두 끊습니다.
     SESSION_STORE.revoke_user(username)
+    audit_log.record("server-cli", "admin_recovery", normalize_username(username))
 
 
 def main(argv: list[str] | None = None) -> int:

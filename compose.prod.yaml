@@ -17,6 +17,7 @@ services:
     logging: *default-logging
     environment:
       ENABLE_LIVE_MOIS_PROXY: "false"
+      REQUIRE_LOGIN_FOR_POPULATION_DATA: ${REQUIRE_LOGIN_FOR_POPULATION_DATA:-false}
       ADMIN_USERNAME: ${ADMIN_USERNAME:?Set ADMIN_USERNAME in deploy.env}
       ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:?Set ADMIN_PASSWORD_HASH in deploy.env}
       ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:?Set ADMIN_SESSION_SECRET in deploy.env}

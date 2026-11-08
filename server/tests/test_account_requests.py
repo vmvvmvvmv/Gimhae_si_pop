@@ -1,3 +1,4 @@
+import sqlite3
 import tempfile
 import threading
 import unittest
@@ -11,6 +12,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db import Base, get_db
 from app.main import app
+from app.services.audit_log import AuditStore
 from app.services.account_store import AccountStore
 from app.services.account_requests import AccountRequestStore
 from app.services.admin_auth import SESSION_COOKIE_NAME, hash_password, issue_session
@@ -44,6 +46,7 @@ class RequestFlowTests(unittest.TestCase):
         app.dependency_overrides[get_db] = test_db
         self.addCleanup(app.dependency_overrides.clear)
         targets = [
+            ("app.services.audit_log.AUDIT_STORE", AuditStore(root / "audit.db")),
             ("app.services.admin_auth.ACCOUNT_STORE", self.accounts),
             ("app.api.admin.ACCOUNT_STORE", self.accounts),
             ("app.api.auth.ACCOUNT_STORE", self.accounts),
@@ -127,13 +130,45 @@ class RequestFlowTests(unittest.TestCase):
 
     # 비밀번호 재설정
 
-    def test_reset_for_unknown_user_looks_the_same_and_stores_nothing(self):
+    def test_reset_request_checks_account_exists_first(self):
         self.logged_out()
-        known = self.client.post("/api/auth/password-reset/request", json={"username": "kim"})
         unknown = self.client.post("/api/auth/password-reset/request", json={"username": "nobody"})
-        self.assertEqual((known.status_code, known.json()), (unknown.status_code, unknown.json()))
-        self.assertTrue(self.requests.exists("reset", "kim"))
+        self.assertEqual(unknown.status_code, 404)
         self.assertFalse(self.requests.exists("reset", "nobody"))
+        known = self.client.post("/api/auth/password-reset/request", json={"username": "kim"})
+        self.assertEqual(known.status_code, 202)
+        self.assertTrue(self.requests.exists("reset", "kim"))
+
+    def test_reset_request_finds_account_regardless_of_case(self):
+        self.logged_out()
+        response = self.client.post("/api/auth/password-reset/request", json={"username": "KIM"})
+        self.assertEqual(response.status_code, 202)
+        self.assertTrue(self.requests.exists("reset", "kim"))
+
+    def test_signup_rejects_same_name_in_any_case(self):
+        self.logged_out()
+        self.assertEqual(self.client.post("/api/auth/signup", json={
+            "username": "Kim", "password": PASSWORD}).status_code, 409)
+        self.assertEqual(self.client.post("/api/auth/signup", json={
+            "username": "park_77", "password": PASSWORD}).status_code, 202)
+        self.assertEqual(self.client.post("/api/auth/signup", json={
+            "username": "PARK_77", "password": PASSWORD}).status_code, 409)
+
+    def test_login_is_case_insensitive_and_names_are_stored_lowercase(self):
+        self.logged_out()
+        self.client.post("/api/auth/signup", json={"username": "Lee_88", "password": PASSWORD})
+        self.login_as("root")
+        self.assertEqual(self.client.post("/api/admin/requests/signup/LEE_88/approve").status_code, 201)
+        self.logged_out()
+        self.assertEqual(self.client.post("/api/admin/login", json={
+            "username": "LEE_88", "password": PASSWORD}).status_code, 200)
+        self.assertIsNotNone(self.accounts.get("lee_88"))
+        raw = sqlite3.connect(self.accounts.db_path)
+        try:
+            names = [row[0] for row in raw.execute("SELECT username FROM accounts")]
+        finally:
+            raw.close()
+        self.assertNotIn("Lee_88", names)
 
     def test_reset_flow_with_admin_issued_code(self):
         self.logged_out()

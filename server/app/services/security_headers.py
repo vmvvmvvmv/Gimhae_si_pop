@@ -1,6 +1,8 @@
 from starlette.responses import Response
 
 
+# style-src의 'unsafe-inline'은 네이버 지도 SDK가 요소에 인라인 style 속성을 넣기 때문에 남겨 둡니다.
+# 제거하려면 지도 키로 실제 지도를 띄워 보고, 콘솔에 style 위반이 없는지 확인한 뒤 바꿔야 합니다.
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; "
     "base-uri 'self'; "

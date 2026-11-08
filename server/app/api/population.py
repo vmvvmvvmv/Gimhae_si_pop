@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from ..db import get_db
+from ..core.config import REQUIRE_LOGIN_FOR_POPULATION_DATA
 from ..services.admin_auth import require_user
 from ..services.mois_proxy_service import (
     LiveProxyError,
@@ -29,6 +30,12 @@ from ..services.population_query_service import (
 
 router = APIRouter()
 export_rate_limiter = ExportRateLimiter()
+
+
+def _require_login_for_population_data(request: Request) -> None:
+    """설정이 켜져 있을 때만 지역 인구 조회에 로그인을 요구합니다."""
+    if REQUIRE_LOGIN_FOR_POPULATION_DATA:
+        require_user(request)
 
 
 def _enforce_export_rate_limit(request: Request) -> None:
@@ -162,7 +169,7 @@ async def admin_age_population(
     )
 
 
-@router.get("/api/population/regions")
+@router.get("/api/population/regions", dependencies=[Depends(_require_login_for_population_data)])
 async def region_population(
     level: PopulationLevel = Query("admin"),
     year: int = Query(2025, ge=2000, le=2100),
@@ -177,7 +184,7 @@ async def region_population(
     )
 
 
-@router.get("/api/population/availability")
+@router.get("/api/population/availability", dependencies=[Depends(_require_login_for_population_data)])
 async def population_availability(db: Session = Depends(get_db)) -> JSONResponse:
     result = read_availability(db)
     return JSONResponse(
@@ -251,7 +258,7 @@ async def population_trend(
     )
 
 
-@router.get("/api/population/admin-regions")
+@router.get("/api/population/admin-regions", dependencies=[Depends(_require_login_for_population_data)])
 async def admin_region_population(
     year: int = Query(2025, ge=2000, le=2100),
     month: int = Query(12, ge=1, le=12),
@@ -263,7 +270,7 @@ async def admin_region_population(
     )
 
 
-@router.get("/api/population/legal-regions")
+@router.get("/api/population/legal-regions", dependencies=[Depends(_require_login_for_population_data)])
 async def legal_region_population(
     year: int = Query(2025, ge=2000, le=2100),
     month: int = Query(12, ge=1, le=12),

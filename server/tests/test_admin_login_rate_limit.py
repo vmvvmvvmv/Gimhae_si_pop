@@ -45,7 +45,8 @@ class LoginRateLimitTests(unittest.TestCase):
 
     def test_login_returns_retry_after_before_password_verification(self):
         request = Request({"type": "http", "client": ("127.0.0.1", 1234), "headers": []})
-        with patch("app.api.admin.admin_auth_configured", return_value=True), \
+        with patch("app.services.audit_log.AUDIT_STORE"), \
+             patch("app.api.admin.admin_auth_configured", return_value=True), \
              patch("app.api.admin.login_limiter") as limiter, \
              patch("app.api.admin.authenticate_account") as authenticate:
             limiter.reserve.return_value = 60
@@ -58,7 +59,8 @@ class LoginRateLimitTests(unittest.TestCase):
     def test_success_clears_client_attempts(self):
         request = Request({"type": "http", "client": ("127.0.0.1", 1234), "headers": []})
         response = Response()
-        with patch("app.api.admin.admin_auth_configured", return_value=True), \
+        with patch("app.services.audit_log.AUDIT_STORE"), \
+             patch("app.api.admin.admin_auth_configured", return_value=True), \
              patch("app.api.admin.login_limiter") as limiter, \
              patch("app.api.admin.authenticate_account",
                    return_value=SimpleNamespace(password_hash="stub-hash")), \
