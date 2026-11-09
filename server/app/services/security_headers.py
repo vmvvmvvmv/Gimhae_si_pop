@@ -28,7 +28,8 @@ PERMISSIONS_POLICY = (
 def apply_security_headers(response: Response) -> Response:
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
-    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    # 네이버 지도가 도메인을 인증하려면 Referer가 필요합니다. 외부로는 경로 없이 출처만 보냅니다.
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
     response.headers.setdefault("Permissions-Policy", PERMISSIONS_POLICY)
     return response
