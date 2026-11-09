@@ -26,6 +26,8 @@ class SecurityHeaderTests(unittest.TestCase):
             for part in response.headers["content-security-policy"].split(";")
         )
         self.assertIn("*.map.naver.net", directives["script-src"])
+        self.assertIn("nrbe.pstatic.net", directives["script-src"])
+        self.assertIn("kr-col-ext.nelo.navercorp.com", directives["connect-src"])
         self.assertIn("static.naver.net", directives["style-src"])
         self.assertNotIn("unsafe-inline", directives["script-src"])
         self.assertNotIn("*.naver.com", directives["script-src"])

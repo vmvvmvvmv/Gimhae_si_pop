@@ -63,7 +63,6 @@ type DetailTab = 'summary' | 'change' | 'age' | 'ranking'
 export default function DashboardPage() {
   // 이 페이지가 지도·조회 조건·선택 지역·상세 패널의 공통 상태를 소유합니다.
   // 지도와 목록 같은 자식 컴포넌트는 필요한 값과 선택 함수를 props로 받습니다.
-  const mapHeadingRef = useRef<HTMLDivElement>(null)
   const [isWelcomeGuideOpen, setIsWelcomeGuideOpen] = useState(shouldShowWelcomeGuide)
   const [boundaryType, setBoundaryType] =
     useState<BoundaryType>('administrative')
@@ -87,7 +86,6 @@ export default function DashboardPage() {
   const [visibleFacilityCategories, setVisibleFacilityCategories] = useState<
     FacilityCategory[]
   >(['ADMIN_CENTER', 'HOSPITAL', 'TRANSIT', 'BRIDGE'])
-  const [compactFacilityControls, setCompactFacilityControls] = useState(true)
   const [openMapControl, setOpenMapControl] =
     useState<MapControlPopover | null>(null)
   const [showBoundaryFill, setShowBoundaryFill] = useState(true)
@@ -198,23 +196,6 @@ export default function DashboardPage() {
 
   const facilityControlsOpen = openMapControl === 'facility'
   const developmentControlsOpen = openMapControl === 'development'
-
-  useEffect(() => {
-    const heading = mapHeadingRef.current
-    if (!heading) return
-
-    const observer = new ResizeObserver(([entry]) => {
-      // 제목, 지도 버튼, 범례와 시설 버튼 전체를 한 줄에 표시하려면
-      // 넓은 화면에서도 충분한 여유가 필요합니다.
-      const compact = entry.contentRect.width < 1800
-      setCompactFacilityControls(compact)
-      if (!compact) {
-        setOpenMapControl(null)
-      }
-    })
-    observer.observe(heading)
-    return () => observer.disconnect()
-  }, [])
 
   const { majorRoadsQuery, waterwaysQuery } = useMapOverlayData()
 
@@ -675,7 +656,7 @@ export default function DashboardPage() {
               <path d={isSidePanelCollapsed ? 'm9 5 7 7-7 7' : 'm15 5-7 7 7 7'} />
             </svg>
           </button>
-          <div className="card-heading" id="map-layers" ref={mapHeadingRef}>
+          <div className="card-heading" id="map-layers">
             <div>
               <h2>{boundaryLabel} 인구 분포</h2>
             </div>
@@ -700,7 +681,6 @@ export default function DashboardPage() {
               toggleDevelopmentControls={toggleDevelopmentControls}
               facilityControlsOpen={facilityControlsOpen}
               toggleFacilityControls={toggleFacilityControls}
-              compactFacilityControls={compactFacilityControls}
               visibleFacilityCategories={visibleFacilityCategories}
               toggleFacilityCategory={toggleFacilityCategory}
               facilityCountByCategory={facilityCountByCategory}

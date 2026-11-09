@@ -23,7 +23,6 @@ interface MapLayerToolbarProps {
   toggleDevelopmentControls: () => void
   facilityControlsOpen: boolean
   toggleFacilityControls: () => void
-  compactFacilityControls: boolean
   visibleFacilityCategories: FacilityCategory[]
   toggleFacilityCategory: (category: FacilityCategory) => void
   facilityCountByCategory: Map<FacilityCategory, number>
@@ -39,7 +38,7 @@ interface MapLayerToolbarProps {
 
 // 지도 위쪽의 레이어 설정 막대입니다. 표시 여부 상태는 지도도 함께 쓰므로 DashboardPage가 가지고 있습니다.
 export default function MapLayerToolbar({
-  showBoundaryFill, setShowBoundaryFill, showRoadTraffic, setShowRoadTraffic, showWaterways, setShowWaterways, showMajorRoads, setShowMajorRoads, showDevelopmentAreas, setShowDevelopmentAreas, hideEndedDevelopmentAreas, setHideEndedDevelopmentAreas, developmentYearFilter, setDevelopmentYearFilter, developmentYearOptions, developmentControlsOpen, toggleDevelopmentControls, facilityControlsOpen, toggleFacilityControls, compactFacilityControls, visibleFacilityCategories, toggleFacilityCategory, facilityCountByCategory, populationMaximum, waterwaysFailed, majorRoadsFailed, developmentAreasFailed, developmentLoading, facilitiesLoading, facilitiesFailed, facilityCountsReady,
+  showBoundaryFill, setShowBoundaryFill, showRoadTraffic, setShowRoadTraffic, showWaterways, setShowWaterways, showMajorRoads, setShowMajorRoads, showDevelopmentAreas, setShowDevelopmentAreas, hideEndedDevelopmentAreas, setHideEndedDevelopmentAreas, developmentYearFilter, setDevelopmentYearFilter, developmentYearOptions, developmentControlsOpen, toggleDevelopmentControls, facilityControlsOpen, toggleFacilityControls, visibleFacilityCategories, toggleFacilityCategory, facilityCountByCategory, populationMaximum, waterwaysFailed, majorRoadsFailed, developmentAreasFailed, developmentLoading, facilitiesLoading, facilitiesFailed, facilityCountsReady,
 }: MapLayerToolbarProps) {
   const activeFacilityLayerCount = visibleFacilityCategories.length
     + Number(showMajorRoads)
@@ -234,58 +233,45 @@ export default function MapLayerToolbar({
         )}
       </div>
       <div className="facility-layer-control">
-        {compactFacilityControls ? (
-          <>
-            <button
-              type="button"
-              className={`facility-menu-toggle ${facilityControlsOpen ? 'open' : ''} ${visibleFacilityCategories.length || showMajorRoads || showRoadTraffic ? 'active' : ''}`}
-              aria-expanded={facilityControlsOpen}
-              aria-haspopup="dialog"
-              aria-controls="facility-layer-menu"
-              onClick={toggleFacilityControls}
-            >
-              <span>주요 시설</span>
-              <small className="map-menu-count">{activeFacilityLayerCount}개</small>
-              <span className="map-menu-chevron" aria-hidden="true" />
-            </button>
-            {facilityControlsOpen && (
-              <div
-                id="facility-layer-menu"
-                className="facility-popover"
-                role="dialog"
-                aria-label="주요 시설 지도 필터"
-              >
-                <div className="facility-popover-heading">
-                  <strong>시설 레이어</strong>
-                </div>
-                {facilitiesLoading && (
-                  <div className="layer-loading-state" role="status">
-                    <span className="loading-spinner" aria-hidden="true" />
-                    시설 정보를 불러오는 중입니다.
-                  </div>
-                )}
-                <div
-                  className="facility-toggles"
-                  aria-label="지도 시설 종류 선택"
-                >
-                  {facilityToggleButtons}
-                  {majorRoadsToggleButton}
-                  {roadTrafficToggleButton}
-                </div>
-                <p className="road-traffic-note">
-                  주요 도로는 VWorld 도로중심선에서 6차로 이상인 구간입니다. 도로 혼잡도를 켜는 동안에는 인구 색상만 숨깁니다.
-                </p>
+        <button
+          type="button"
+          className={`facility-menu-toggle ${facilityControlsOpen ? 'open' : ''} ${visibleFacilityCategories.length || showMajorRoads || showRoadTraffic ? 'active' : ''}`}
+          aria-expanded={facilityControlsOpen}
+          aria-haspopup="dialog"
+          aria-controls="facility-layer-menu"
+          onClick={toggleFacilityControls}
+        >
+          <span>주요 시설</span>
+          <small className="map-menu-count">{activeFacilityLayerCount}개</small>
+          <span className="map-menu-chevron" aria-hidden="true" />
+        </button>
+        {facilityControlsOpen && (
+          <div
+            id="facility-layer-menu"
+            className="facility-popover"
+            role="dialog"
+            aria-label="주요 시설 지도 필터"
+          >
+            <div className="facility-popover-heading">
+              <strong>시설 레이어</strong>
+            </div>
+            {facilitiesLoading && (
+              <div className="layer-loading-state" role="status">
+                <span className="loading-spinner" aria-hidden="true" />
+                시설 정보를 불러오는 중입니다.
               </div>
             )}
-          </>
-        ) : (
-          <div
-            className="facility-toggles"
-            aria-label="지도 시설 종류 선택"
-          >
-            {facilityToggleButtons}
-            {majorRoadsToggleButton}
-            {roadTrafficToggleButton}
+            <div
+              className="facility-toggles"
+              aria-label="지도 시설 종류 선택"
+            >
+              {facilityToggleButtons}
+              {majorRoadsToggleButton}
+              {roadTrafficToggleButton}
+            </div>
+            <p className="road-traffic-note">
+              주요 도로는 VWorld 도로중심선에서 6차로 이상인 구간입니다. 도로 혼잡도를 켜는 동안에는 인구 색상만 숨깁니다.
+            </p>
           </div>
         )}
       </div>

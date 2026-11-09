@@ -46,7 +46,6 @@ function toolbar(overrides: Partial<ToolbarProps> = {}) {
     developmentYearOptions: [2026],
     developmentControlsOpen: false, toggleDevelopmentControls: noop,
     facilityControlsOpen: false, toggleFacilityControls: noop,
-    compactFacilityControls: true,
     visibleFacilityCategories: ['HOSPITAL'],
     toggleFacilityCategory: noop,
     facilityCountByCategory: new Map(),
