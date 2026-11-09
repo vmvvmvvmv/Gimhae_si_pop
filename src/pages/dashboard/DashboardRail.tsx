@@ -4,12 +4,11 @@ import GisDataLink from './GisDataLink'
 
 export type SidePanelView = 'region' | 'development' | 'facility'
 
-export default function DashboardRail({ sidePanelView, onShowRegion, onShowDevelopment, onShowFacility, onOpenGuide }: {
+export default function DashboardRail({ sidePanelView, onShowRegion, onShowDevelopment, onShowFacility }: {
   sidePanelView: SidePanelView
   onShowRegion: () => void
   onShowDevelopment: () => void
   onShowFacility: () => void
-  onOpenGuide: () => void
 }) {
   return (
     <nav className="dashboard-service-rail" aria-label="지도 서비스 메뉴">
@@ -53,14 +52,6 @@ export default function DashboardRail({ sidePanelView, onShowRegion, onShowDevel
         </GisDataLink>
       </div>
       <AccountMenu />
-      <button
-        type="button"
-        className="dashboard-guide-trigger dashboard-guide-rail"
-        onClick={onOpenGuide}
-      >
-        <span aria-hidden="true">?</span>
-        사용 안내
-      </button>
       <div className="dashboard-rail-caption">GIMHAE GIS</div>
     </nav>
   )

@@ -98,7 +98,6 @@ describe('DashboardRail', () => {
         onShowRegion={vi.fn()}
         onShowDevelopment={onShowDevelopment}
         onShowFacility={onShowFacility}
-        onOpenGuide={vi.fn()}
       />,
     )
     fireEvent.click(screen.getByRole('button', { name: '개발계획' }))

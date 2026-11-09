@@ -100,9 +100,6 @@
     font-size: 11px;
   }
 
-  .dashboard-service-rail .account-menu + .dashboard-guide-rail {
-    margin-top: 8px;
-  }
 
   @supports (anchor-name: --account) {
     .dashboard-service-rail .account-menu-name {

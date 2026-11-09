@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import AgeDistributionChart from '../components/common/AgeDistributionChart'
 import RegionComparisonTable from '../components/common/RegionComparisonTable'
 import PopulationCsvExport from '../components/common/PopulationCsvExport'
 import TwoRegionComparison from '../components/common/TwoRegionComparison'
-import WelcomeGuide from '../components/common/WelcomeGuide'
 import NaverMap, {
   type AddressSearchRequest,
   type AddressSearchResult,
@@ -42,10 +41,6 @@ import {
   toggleMapControlPopover,
   type MapControlPopover,
 } from '../features/map/mapPresentation'
-import {
-  rememberWelcomeGuide,
-  shouldShowWelcomeGuide,
-} from '../features/onboarding/welcomeGuideStorage'
 import './DashboardPage.css'
 
 interface RegionPairComparison {
@@ -63,7 +58,6 @@ type DetailTab = 'summary' | 'change' | 'age' | 'ranking'
 export default function DashboardPage() {
   // 이 페이지가 지도·조회 조건·선택 지역·상세 패널의 공통 상태를 소유합니다.
   // 지도와 목록 같은 자식 컴포넌트는 필요한 값과 선택 함수를 props로 받습니다.
-  const [isWelcomeGuideOpen, setIsWelcomeGuideOpen] = useState(shouldShowWelcomeGuide)
   const [boundaryType, setBoundaryType] =
     useState<BoundaryType>('administrative')
   const [selectedRegion, setSelectedRegion] =
@@ -96,18 +90,6 @@ export default function DashboardPage() {
   const [developmentYearFilter, setDevelopmentYearFilter] = useState('all')
   const [hideEndedDevelopmentAreas, setHideEndedDevelopmentAreas] =
     useState(false)
-
-  const closeWelcomeGuide = useCallback(() => {
-    // 완료와 건너뛰기를 모두 기록해 다음 방문에는 자동으로 다시 띄우지 않습니다.
-    rememberWelcomeGuide()
-    setIsWelcomeGuideOpen(false)
-  }, [])
-
-  const openWelcomeGuide = () => {
-    // 다시 볼 때 패널이 접혀 있으면 상세 정보 강조 대상이 보이지 않습니다.
-    setIsSidePanelCollapsed(false)
-    setIsWelcomeGuideOpen(true)
-  }
 
   // 지도에서 동을 누르거나 검색 결과를 고르면 이 함수가 실행됩니다.
   // 선택값은 여기서 기억하고,
@@ -402,7 +384,6 @@ export default function DashboardPage() {
           setSidePanelView('facility')
           setIsSidePanelCollapsed(false)
         }}
-        onOpenGuide={openWelcomeGuide}
       />
 
       <section className="filter-card" id="dashboard-filters" aria-label="조회 조건">
@@ -630,14 +611,6 @@ export default function DashboardPage() {
             </div>
           )}
         </form>
-        <button
-          type="button"
-          className="dashboard-guide-trigger dashboard-guide-mobile"
-          onClick={openWelcomeGuide}
-        >
-          <span aria-hidden="true">?</span>
-          사용 안내
-        </button>
         <AccountMenu />
       </section>
 
@@ -942,7 +915,6 @@ export default function DashboardPage() {
         </aside>
       </section>
 
-      {isWelcomeGuideOpen && <WelcomeGuide onClose={closeWelcomeGuide} />}
 
     </main>
   )

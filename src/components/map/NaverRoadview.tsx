@@ -121,10 +121,36 @@ function loadGeocoderModule(): Promise<void> {
   return modulePromise
 }
 
+type RoadviewCoordinate = { latitude: number; longitude: number }
+
+// 새로고침해도 같은 탭에서는 주소 변환 API를 다시 호출하지 않도록 성공한 결과만 보관합니다.
+function readStoredCoordinate(address: string): RoadviewCoordinate | null {
+  try {
+    const stored = sessionStorage.getItem(`roadview-geocode:${address}`)
+    return stored ? JSON.parse(stored) as RoadviewCoordinate : null
+  } catch {
+    return null
+  }
+}
+
+function storeCoordinate(address: string, coordinate: RoadviewCoordinate): void {
+  try {
+    sessionStorage.setItem(`roadview-geocode:${address}`, JSON.stringify(coordinate))
+  } catch {
+    // 저장소를 쓸 수 없으면 메모리 캐시만 사용합니다.
+  }
+}
+
 async function geocodeAddress(
   address: string,
-): Promise<{ latitude: number; longitude: number } | null> {
+): Promise<RoadviewCoordinate | null> {
   if (geocodeCache.has(address)) return geocodeCache.get(address) ?? null
+
+  const storedCoordinate = readStoredCoordinate(address)
+  if (storedCoordinate) {
+    geocodeCache.set(address, storedCoordinate)
+    return storedCoordinate
+  }
 
   try {
     await loadGeocoderModule()
@@ -138,7 +164,8 @@ async function geocodeAddress(
 
   return new Promise((resolve) => {
     service.geocode({ query: address }, (status, response) => {
-      const firstAddress = response?.v2.addresses[0]
+      // 요청이 실패하면 v2가 없습니다. 여기서 멈추면 로드뷰가 계속 로딩 상태로 남습니다.
+      const firstAddress = response?.v2?.addresses[0]
       const latitude = Number(firstAddress?.y)
       const longitude = Number(firstAddress?.x)
       const coordinate =
@@ -148,6 +175,7 @@ async function geocodeAddress(
           ? { latitude, longitude }
           : null
       geocodeCache.set(address, coordinate)
+      if (coordinate) storeCoordinate(address, coordinate)
       resolve(coordinate)
     })
   })
