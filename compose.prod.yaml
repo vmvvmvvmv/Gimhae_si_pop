@@ -41,7 +41,7 @@ services:
     depends_on:
       app:
         condition: service_healthy
-    command: ["python", "-m", "app.backup_database", "--daily", "--keep", "14"]
+    command: ["python", "-m", "app.backup_database", "--daily", "--keep", "7"]
     environment:
       PYTHONUNBUFFERED: "1"
     volumes:
