@@ -12,7 +12,7 @@ class SecurityHeaderTests(unittest.TestCase):
 
         self.assertEqual(response.headers["x-content-type-options"], "nosniff")
         self.assertEqual(response.headers["x-frame-options"], "DENY")
-        self.assertEqual(response.headers["referrer-policy"], "no-referrer")
+        self.assertEqual(response.headers["referrer-policy"], "strict-origin-when-cross-origin")
         self.assertIn("default-src 'self'", response.headers["content-security-policy"])
         self.assertIn("frame-ancestors 'none'", response.headers["content-security-policy"])
         self.assertIn("geolocation=()", response.headers["permissions-policy"])
