@@ -1,0 +1,87 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_NAVER_MAP_CLIENT_ID: ${VITE_NAVER_MAP_CLIENT_ID:?Set VITE_NAVER_MAP_CLIENT_ID}
+    image: gimhae-map:nginx
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      ENABLE_LIVE_MOIS_PROXY: "false"
+      REQUIRE_LOGIN_FOR_POPULATION_DATA: ${REQUIRE_LOGIN_FOR_POPULATION_DATA:-true}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?Set ADMIN_USERNAME}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:?Set ADMIN_PASSWORD_HASH}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:?Set ADMIN_SESSION_SECRET}
+      ADMIN_COOKIE_SECURE: "true"
+      MOIS_SERVICE_KEY: ${MOIS_SERVICE_KEY:?Set MOIS_SERVICE_KEY}
+      CORS_ORIGINS: https://${SITE_DOMAIN:?Set SITE_DOMAIN}
+    volumes:
+      - type: bind
+        source: ${GIMHAE_DATA_DIR:-./server/data}
+        target: /app/server/data
+        bind:
+          create_host_path: false
+    expose:
+      - "8000"
+    networks:
+      - app_net
+
+  backup:
+    image: gimhae-map:nginx
+    pull_policy: never
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      app:
+        condition: service_healthy
+    command: ["python", "-m", "app.backup_database", "--daily", "--keep", "7"]
+    environment:
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - type: bind
+        source: ${GIMHAE_DATA_DIR:-./server/data}
+        target: /app/server/data
+        bind:
+          create_host_path: false
+    healthcheck:
+      disable: true
+    network_mode: none
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot_www:/var/www/certbot:ro
+      - certbot_conf:/etc/letsencrypt:ro
+    networks:
+      - app_net
+
+  certbot:
+    image: certbot/certbot
+    profiles: ["certbot"]
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_conf:/etc/letsencrypt
+
+networks:
+  app_net:
+
+volumes:
+  certbot_www:
+  certbot_conf:
