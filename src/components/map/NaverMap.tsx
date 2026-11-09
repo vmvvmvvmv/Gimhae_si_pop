@@ -87,6 +87,10 @@ interface NaverMapProps {
 const EMPTY_POPULATION_ITEMS: AdminPopulationRegion[] = []
 const EMPTY_FACILITY_ITEMS: FacilityItem[] = []
 const EMPTY_DEVELOPMENT_NOTICES: DevelopmentNotice[] = []
+// 김해시 경계(위도 35.152~35.395, 경도 128.694~129.013)에 약간의 여유를 둔 지도 이동 범위입니다.
+const GIMHAE_MAP_BOUNDS = { south: 35.12, west: 128.66, north: 35.43, east: 129.05 }
+// 좁은 화면에서도 김해시 전체가 들어오는 가장 작은 축척입니다.
+const GIMHAE_MIN_ZOOM = 11
 
 
 export default function NaverMap({
@@ -336,6 +340,11 @@ export default function NaverMap({
         const map = new window.naver.maps.Map(mapElement.current, {
           center: new window.naver.maps.LatLng(35.228, 128.889),
           zoom: 12,
+          minZoom: GIMHAE_MIN_ZOOM,
+          maxBounds: new window.naver.maps.LatLngBounds(
+            new window.naver.maps.LatLng(GIMHAE_MAP_BOUNDS.south, GIMHAE_MAP_BOUNDS.west),
+            new window.naver.maps.LatLng(GIMHAE_MAP_BOUNDS.north, GIMHAE_MAP_BOUNDS.east),
+          ),
           mapTypeId: window.naver.maps.MapTypeId.NORMAL,
           baseTileOpacity: 1,
           mapTypeControl: true,

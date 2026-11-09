@@ -47,21 +47,38 @@ export function getBoundaryProperties(feature: NaverFeature): Record<string, unk
   }
 }
 
-// 네이버 Data 레이어는 선 도형을 구간마다 별도 SVG로 그려서, 경계를 선으로 올리면 이동·확대가 느려집니다.
-// 면 도형은 하나의 SVG로 그려지므로 채우기만 투명하게 한 면으로 경계선을 표시합니다.
 export function createBoundaryOutlines(
   boundary: GeoJsonCollection,
 ): GeoJsonCollection {
   return {
     type: 'FeatureCollection',
     name: `${boundary.name ?? 'boundary'} outlines`,
-    features: boundary.features
-      .filter(({ geometry }) => geometry.type === 'Polygon' || geometry.type === 'MultiPolygon')
-      .map((feature) => ({
-        type: 'Feature' as const,
-        properties: { __layer: 'boundary-outline' },
-        geometry: feature.geometry,
-      })),
+    features: boundary.features.flatMap((feature, featureIndex) => {
+      const { geometry } = feature
+      let lineCoordinates: unknown
+
+      if (geometry.type === 'Polygon') {
+        lineCoordinates = geometry.coordinates
+      } else if (geometry.type === 'MultiPolygon') {
+        lineCoordinates = (geometry.coordinates as unknown[]).flat()
+      } else {
+        return []
+      }
+
+      return [
+        {
+          type: 'Feature' as const,
+          properties: {
+            __layer: 'boundary-outline',
+            __sourceFeatureIndex: featureIndex,
+          },
+          geometry: {
+            type: 'MultiLineString',
+            coordinates: lineCoordinates,
+          },
+        },
+      ]
+    }),
   }
 }
 
@@ -138,7 +155,6 @@ export function applyPopulationStyles(
 
     if (feature.getProperty('__layer') === 'boundary-outline') {
       return {
-        fillOpacity: 0,
         strokeColor: BOUNDARY_STROKE_COLOR,
         strokeOpacity: 1,
         strokeWeight: 1.8,
@@ -163,18 +179,70 @@ export function applyPopulationStyles(
   })
 }
 
+const positionKey = (position: number[]) => `${position[0]},${position[1]}`
+
+// 네이버 Data 레이어는 선 하나마다 SVG를 만듭니다. 도로중심선은 짧은 구간이 많아 그대로 올리면
+// 이동·확대가 느려지므로, 갈림길이 아닌 지점에서 맞닿은 구간을 한 선으로 잇습니다.
+function joinConnectedLines(lines: number[][][]): number[][][] {
+  const linesByEndpoint = new Map<string, number[]>()
+  lines.forEach((line, index) => {
+    for (const endpoint of [line[0], line[line.length - 1]]) {
+      const key = positionKey(endpoint)
+      linesByEndpoint.set(key, [...(linesByEndpoint.get(key) ?? []), index])
+    }
+  })
+
+  const used = new Set<number>()
+  const extend = (chain: number[][]) => {
+    for (;;) {
+      const tail = chain[chain.length - 1]
+      const connected = linesByEndpoint.get(positionKey(tail)) ?? []
+      const nextIndex = connected.length === 2
+        ? connected.find((index) => !used.has(index))
+        : undefined
+      if (nextIndex === undefined) return
+
+      used.add(nextIndex)
+      const next = lines[nextIndex]
+      const ordered = positionKey(next[0]) === positionKey(tail) ? next : [...next].reverse()
+      chain.push(...ordered.slice(1))
+    }
+  }
+
+  return lines.flatMap((line, index) => {
+    if (used.has(index)) return []
+    used.add(index)
+    const chain = [...line]
+    extend(chain)
+    chain.reverse()
+    extend(chain)
+    return [chain]
+  })
+}
+
 export function createMajorRoadOverlays(collection: GeoJsonCollection): GeoJsonCollection {
   return {
     ...collection,
-    features: collection.features.flatMap((feature) => [
-      {
-        ...feature,
-        properties: { ...feature.properties, __layer: 'major-road-casing' },
-      },
-      {
-        ...feature,
-        properties: { ...feature.properties, __layer: 'major-road-core' },
-      },
-    ]),
+    features: collection.features.flatMap((source) => {
+      const feature = source.geometry.type === 'MultiLineString'
+        ? {
+            ...source,
+            geometry: {
+              ...source.geometry,
+              coordinates: joinConnectedLines(source.geometry.coordinates as number[][][]),
+            },
+          }
+        : source
+      return [
+        {
+          ...feature,
+          properties: { ...feature.properties, __layer: 'major-road-casing' },
+        },
+        {
+          ...feature,
+          properties: { ...feature.properties, __layer: 'major-road-core' },
+        },
+      ]
+    }),
   }
 }
