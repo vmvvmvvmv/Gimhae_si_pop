@@ -30,6 +30,8 @@ declare global {
     getProjection(): {
       fromCoordToOffset(coordinate: unknown): { x: number; y: number }
     }
+    getCenter(): unknown
+    panTo(coordinate: unknown): void
     morph(
       coordinate: unknown,
       zoom?: number,

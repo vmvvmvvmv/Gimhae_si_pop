@@ -66,6 +66,25 @@ describe('AuthForms', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('가입 신청 뒤 코드를 입력하면 계정을 만들고 로그인으로 돌아간다', async () => {
+    const fetchMock = stubFetch(201)
+    render(<AuthForms initialMode="signup" onLoggedIn={vi.fn()} />)
+
+    type('아이디(영문·숫자·._- , 3~50자)', 'new_user')
+    type('비밀번호(10자 이상)', 'long-enough-password')
+    type('비밀번호 확인', 'long-enough-password')
+    fireEvent.click(screen.getByRole('button', { name: '가입 신청' }))
+
+    await screen.findByLabelText('가입 코드')
+    type('가입 코드', ' ABCDE-FGHJK ')
+    fireEvent.click(screen.getByRole('button', { name: '가입 완료' }))
+
+    await screen.findByText('계정이 만들어졌습니다. 신청할 때 정한 비밀번호로 로그인하세요.')
+    const [url, init] = fetchMock.mock.calls[1] as unknown as [string, RequestInit]
+    expect(url).toContain('/auth/signup/confirm')
+    expect(JSON.parse(String(init.body))).toEqual({ username: 'new_user', code: 'ABCDE-FGHJK' })
+  })
+
   it('이미 코드를 받았으면 요청 없이 코드 입력으로 넘어간다', () => {
     const fetchMock = stubFetch(202)
     render(<AuthForms onLoggedIn={vi.fn()} />)

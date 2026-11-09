@@ -8,7 +8,6 @@ server/.venv
 server/data
 .docx_work
 _workspace
-# 내부 기획·배포 문서는 이미지에 넣지 않습니다.
 docs
 **/__pycache__
 *.pyc

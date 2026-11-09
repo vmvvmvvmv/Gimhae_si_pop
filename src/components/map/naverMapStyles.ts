@@ -179,18 +179,70 @@ export function applyPopulationStyles(
   })
 }
 
+const positionKey = (position: number[]) => `${position[0]},${position[1]}`
+
+// 네이버 Data 레이어는 선 하나마다 SVG를 만듭니다. 도로중심선은 짧은 구간이 많아 그대로 올리면
+// 이동·확대가 느려지므로, 갈림길이 아닌 지점에서 맞닿은 구간을 한 선으로 잇습니다.
+function joinConnectedLines(lines: number[][][]): number[][][] {
+  const linesByEndpoint = new Map<string, number[]>()
+  lines.forEach((line, index) => {
+    for (const endpoint of [line[0], line[line.length - 1]]) {
+      const key = positionKey(endpoint)
+      linesByEndpoint.set(key, [...(linesByEndpoint.get(key) ?? []), index])
+    }
+  })
+
+  const used = new Set<number>()
+  const extend = (chain: number[][]) => {
+    for (;;) {
+      const tail = chain[chain.length - 1]
+      const connected = linesByEndpoint.get(positionKey(tail)) ?? []
+      const nextIndex = connected.length === 2
+        ? connected.find((index) => !used.has(index))
+        : undefined
+      if (nextIndex === undefined) return
+
+      used.add(nextIndex)
+      const next = lines[nextIndex]
+      const ordered = positionKey(next[0]) === positionKey(tail) ? next : [...next].reverse()
+      chain.push(...ordered.slice(1))
+    }
+  }
+
+  return lines.flatMap((line, index) => {
+    if (used.has(index)) return []
+    used.add(index)
+    const chain = [...line]
+    extend(chain)
+    chain.reverse()
+    extend(chain)
+    return [chain]
+  })
+}
+
 export function createMajorRoadOverlays(collection: GeoJsonCollection): GeoJsonCollection {
   return {
     ...collection,
-    features: collection.features.flatMap((feature) => [
-      {
-        ...feature,
-        properties: { ...feature.properties, __layer: 'major-road-casing' },
-      },
-      {
-        ...feature,
-        properties: { ...feature.properties, __layer: 'major-road-core' },
-      },
-    ]),
+    features: collection.features.flatMap((source) => {
+      const feature = source.geometry.type === 'MultiLineString'
+        ? {
+            ...source,
+            geometry: {
+              ...source.geometry,
+              coordinates: joinConnectedLines(source.geometry.coordinates as number[][][]),
+            },
+          }
+        : source
+      return [
+        {
+          ...feature,
+          properties: { ...feature.properties, __layer: 'major-road-casing' },
+        },
+        {
+          ...feature,
+          properties: { ...feature.properties, __layer: 'major-road-core' },
+        },
+      ]
+    }),
   }
 }

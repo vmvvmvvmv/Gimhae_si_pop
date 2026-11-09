@@ -3,11 +3,12 @@ import type { FormEvent } from 'react'
 import { postJson } from '../../lib/postJson'
 import './LoginModal.css'
 
-export type AuthMode = 'login' | 'signup' | 'reset-request' | 'reset-confirm'
+export type AuthMode = 'login' | 'signup' | 'signup-confirm' | 'reset-request' | 'reset-confirm'
 
 const TITLES: Record<AuthMode, string> = {
   login: '로그인이 필요합니다',
   signup: '회원가입 신청',
+  'signup-confirm': '가입 코드 입력',
   'reset-request': '비밀번호 재설정',
   'reset-confirm': '재설정 코드 입력',
 }
@@ -64,12 +65,21 @@ export default function AuthForms({ initialMode = 'login', onLoggedIn, onClose }
     if (password !== confirmPassword) return
     void run(async () => {
       await postJson('/auth/signup', { username, password })
-      setUsername('')
       setPassword('')
       setConfirmPassword('')
-      setMode('login')
-      setNotice('가입 신청이 접수되었습니다. 관리자가 승인하면 로그인할 수 있습니다.')
+      setMode('signup-confirm')
+      setNotice('가입 신청이 접수되었습니다. 관리자가 알려 준 코드를 입력하면 계정이 만들어집니다.')
     }, '가입 신청에 실패했습니다.')
+  }
+
+  const submitSignupConfirm = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    void run(async () => {
+      await postJson('/auth/signup/confirm', { username, code: code.trim() })
+      setCode('')
+      setMode('login')
+      setNotice('계정이 만들어졌습니다. 신청할 때 정한 비밀번호로 로그인하세요.')
+    }, '가입을 완료하지 못했습니다.')
   }
 
   const submitResetRequest = (event: FormEvent<HTMLFormElement>) => {
@@ -149,7 +159,7 @@ export default function AuthForms({ initialMode = 'login', onLoggedIn, onClose }
 
     {mode === 'signup' && (
       <>
-        <p>신청 후 관리자가 승인해야 계정이 만들어집니다.</p>
+        <p>신청 후 관리자에게 받은 코드를 입력하면 계정이 만들어집니다.</p>
         <form onSubmit={submitSignup}>
           <label>
             아이디(영문·숫자·._- , 3~50자)
@@ -188,6 +198,41 @@ export default function AuthForms({ initialMode = 'login', onLoggedIn, onClose }
           <div className="login-modal-actions">
             <button type="button" onClick={() => goTo('login')}>로그인으로</button>
             <button type="submit" disabled={loading}>{loading ? '신청 중…' : '가입 신청'}</button>
+          </div>
+        </form>
+        <p className="login-modal-links">
+          <button type="button" className="login-modal-link" onClick={() => goTo('signup-confirm')}>이미 코드를 받았어요</button>
+        </p>
+      </>
+    )}
+
+    {mode === 'signup-confirm' && (
+      <>
+        <p>관리자가 준 일회용 코드는 24시간 동안 유효합니다.</p>
+        <form onSubmit={submitSignupConfirm}>
+          <label>
+            아이디
+            <input
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              autoComplete="username"
+              required
+            />
+          </label>
+          <label>
+            가입 코드
+            <input
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              autoComplete="one-time-code"
+              required
+            />
+          </label>
+          {notice && <p role="status" className="login-modal-notice">{notice}</p>}
+          {error && <p role="alert" className="login-modal-error">{error}</p>}
+          <div className="login-modal-actions">
+            <button type="button" onClick={() => goTo('login')}>로그인으로</button>
+            <button type="submit" disabled={loading}>{loading ? '확인 중…' : '가입 완료'}</button>
           </div>
         </form>
       </>

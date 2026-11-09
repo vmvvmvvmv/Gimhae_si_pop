@@ -1,9 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import {
+  clampMapCenter,
   getBoundaryVisualStyle,
   shouldShowMapHoverPreview,
   toggleMapControlPopover,
 } from './mapPresentation'
+
+describe('지도 중심 제한', () => {
+  it('김해 안의 중심은 그대로 둔다', () => {
+    expect(clampMapCenter(128.889, 35.228)).toEqual([128.889, 35.228])
+  })
+
+  it('김해 밖의 중심은 가장 가까운 경계로 되돌린다', () => {
+    expect(clampMapCenter(127.0, 37.5)).toEqual([128.69, 35.4])
+    expect(clampMapCenter(130.0, 34.0)).toEqual([129.02, 35.15])
+  })
+})
 
 describe('지도 표시 상태', () => {
   it('선택 지역은 일반 지역보다 굵고 높은 경계로 유지한다', () => {

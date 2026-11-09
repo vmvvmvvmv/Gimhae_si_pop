@@ -300,7 +300,7 @@ export function useRegionDetailQueries({
   }
 }
 
-export function useRegionBoundaries(boundaryType: BoundaryType) {
+export function useRegionBoundaries(boundaryType: BoundaryType, needsLegalBoundary: boolean) {
   const administrativeBoundaryQuery = useQuery({
     queryKey: ['boundary-search', 'administrative'],
     queryFn: () => loadBoundary('administrative'),
@@ -311,6 +311,8 @@ export function useRegionBoundaries(boundaryType: BoundaryType) {
     queryKey: ['boundary-search', 'legal'],
     queryFn: () => loadBoundary('legal'),
     staleTime: Number.POSITIVE_INFINITY,
+    // 법정동 도형은 크므로 법정동을 보거나, 검색하거나, 지역을 고를 때만 받습니다.
+    enabled: boundaryType === 'legal' || needsLegalBoundary,
   })
 
   const administrativeExportRegions = useMemo(() => {

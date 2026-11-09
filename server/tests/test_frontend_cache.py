@@ -37,6 +37,16 @@ class FrontendCacheHeaderTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("immutable", response.headers["cache-control"])
 
+    def test_hidden_paths_are_not_served_as_the_app(self):
+        for path in ("/.env", "/.git/config", "/assets/.secret"):
+            self.assertEqual(self.client.get(path).status_code, 404, path)
+
+    def test_head_request_is_supported_for_uptime_checks(self):
+        self.assertEqual(self.client.head("/").status_code, 200)
+
+    def test_public_health_does_not_reveal_configuration(self):
+        self.assertEqual(self.client.get("/api/health").json(), {"status": "ok"})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -20,6 +20,8 @@ from .account_store import ACCOUNTS_PATH, normalize_username
 SIGNUP = "signup"
 RESET = "reset"
 RESET_CODE_TTL_SECONDS = 30 * 60
+# 가입 코드는 관리자가 직접 전달하므로 받는 사람이 시간을 낼 수 있게 하루로 둡니다.
+SIGNUP_CODE_TTL_SECONDS = 24 * 60 * 60
 # 관리자가 처리하지 않은 신청·요청은 7일 뒤 자동으로 지웁니다.
 REQUEST_TTL_SECONDS = 7 * 24 * 60 * 60
 # 헷갈리는 글자(0, O, 1, I 등)를 뺀 알파벳으로 10자리 코드를 만듭니다.
@@ -120,14 +122,15 @@ class AccountRequestStore:
             for row in rows
         ]
 
-    def take_signup(self, username: str) -> str | None:
-        """신청을 한 번만 꺼냅니다. 두 번 승인해도 두 번째는 None을 받습니다."""
+    def take_signup_with_code(self, username: str, code: str) -> str | None:
+        """코드가 맞고 만료 전이면 신청을 한 번만 꺼냅니다. 같은 코드를 다시 쓰면 None입니다."""
         username = normalize_username(username)
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute(
-                "SELECT password_hash FROM account_requests WHERE kind = ? AND username = ?",
-                (SIGNUP, username),
+                "SELECT password_hash FROM account_requests "
+                "WHERE kind = ? AND username = ? AND code_hash = ? AND expires_at > ?",
+                (SIGNUP, username, _code_digest(code), int(time.time())),
             ).fetchone()
             if row is None:
                 return None
@@ -153,7 +156,13 @@ class AccountRequestStore:
             ).fetchone() is not None
 
     def issue_reset_code(self, username: str) -> str | None:
-        """승인된 재설정 요청에 일회용 코드를 붙입니다. 코드 원문은 이 반환값으로만 한 번 보입니다."""
+        return self._issue_code(RESET, username, RESET_CODE_TTL_SECONDS)
+
+    def issue_signup_code(self, username: str) -> str | None:
+        return self._issue_code(SIGNUP, username, SIGNUP_CODE_TTL_SECONDS)
+
+    def _issue_code(self, kind: str, username: str, ttl_seconds: int) -> str | None:
+        """대기 중인 요청에 일회용 코드를 붙입니다. 코드 원문은 이 반환값으로만 전달합니다."""
         code = "-".join(
             "".join(secrets.choice(_CODE_ALPHABET) for _ in range(5)) for _ in range(2)
         )
@@ -163,8 +172,8 @@ class AccountRequestStore:
                 "WHERE kind = ? AND username = ?",
                 (
                     _code_digest(code),
-                    int(time.time()) + RESET_CODE_TTL_SECONDS,
-                    RESET,
+                    int(time.time()) + ttl_seconds,
+                    kind,
                     normalize_username(username),
                 ),
             )

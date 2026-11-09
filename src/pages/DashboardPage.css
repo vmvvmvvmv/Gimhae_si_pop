@@ -1329,25 +1329,6 @@
   background: #e7f0f0;
 }
 
-.map-tour-region {
-  position: absolute;
-  pointer-events: none;
-}
-
-.map-tour-region path {
-  fill: transparent;
-  pointer-events: none;
-}
-
-body[data-map-tour-active="true"] .map-tour-region {
-  z-index: 100;
-}
-
-body[data-map-tour-active="true"] .map-tour-region path {
-  pointer-events: fill;
-  cursor: pointer;
-}
-
 .major-road-map-note {
   position: absolute;
   z-index: 21;
@@ -5042,69 +5023,9 @@ body[data-map-tour-active="true"] .map-tour-region path {
   }
 }
 
-/* 첫 방문 안내는 언제든 다시 열 수 있습니다. 데스크톱은 왼쪽 메뉴, 모바일은 조회 조건에 둡니다. */
-.dashboard-guide-trigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 38px;
-  border: 1px solid #cbddeb;
-  border-radius: 10px;
-  padding: 7px 10px;
-  color: #2d67b1;
-  background: #f4f8fe;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.dashboard-guide-trigger span {
-  display: grid;
-  width: 19px;
-  height: 19px;
-  place-items: center;
-  border-radius: 50%;
-  color: #fff;
-  background: #2d67b1;
-  font-size: 12px;
-  line-height: 1;
-}
-
-.dashboard-guide-trigger:hover,
-.dashboard-guide-trigger:focus-visible {
-  color: #174d89;
-  background: #e7f1ff;
-  outline: 2px solid #8fc4f5;
-  outline-offset: 2px;
-}
-
-.dashboard-guide-rail {
-  display: none;
-}
-
-.dashboard-guide-mobile {
-  align-self: flex-end;
-  margin-left: auto;
-}
-
 @media (min-width: 821px) {
-  .dashboard-guide-rail {
-    display: flex;
-    min-height: 58px;
-    width: calc(100% - 10px);
-    flex-direction: column;
-    gap: 2px;
-    margin-top: auto;
-    padding: 6px 2px;
-    font-size: 11px;
-  }
-
   .dashboard-page .dashboard-rail-caption {
     margin-top: 12px;
-  }
-
-  .dashboard-guide-mobile {
-    display: none;
   }
 }
 
@@ -5565,18 +5486,12 @@ body[data-map-tour-active="true"] .map-tour-region path {
 }
 
 .dashboard-page .facility-roadview-actions > button,
-.dashboard-page .facility-roadview-actions > a,
-.dashboard-page .dashboard-guide-trigger {
+.dashboard-page .facility-roadview-actions > a {
   color: var(--ui-accent);
   background: transparent;
   border: 0;
   border-radius: 0;
   box-shadow: none;
-}
-
-.dashboard-page .dashboard-guide-trigger span {
-  color: var(--ui-accent);
-  background: transparent;
 }
 
 .dashboard-page .description-empty-notice,
