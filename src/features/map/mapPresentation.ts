@@ -51,6 +51,17 @@ export function toggleMapControlPopover(
   return current === target ? null : target
 }
 
+// 김해시 경계 범위입니다. 지도 중심이 이 안에 있으면 김해가 항상 화면에 남습니다.
+const GIMHAE_CENTER_LIMITS = { south: 35.15, north: 35.4, west: 128.69, east: 129.02 }
+
+export function clampMapCenter(longitude: number, latitude: number): [number, number] {
+  const { south, north, west, east } = GIMHAE_CENTER_LIMITS
+  return [
+    Math.min(Math.max(longitude, west), east),
+    Math.min(Math.max(latitude, south), north),
+  ]
+}
+
 export function shouldShowMapHoverPreview(
   developmentInfoPinned: boolean,
 ): boolean {

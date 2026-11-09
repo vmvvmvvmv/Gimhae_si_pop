@@ -30,6 +30,8 @@ declare global {
     getProjection(): {
       fromCoordToOffset(coordinate: unknown): { x: number; y: number }
     }
+    getCenter(): unknown
+    panTo(coordinate: unknown): void
     morph(
       coordinate: unknown,
       zoom?: number,
@@ -90,7 +92,6 @@ declare global {
       options: Record<string, unknown>,
     ) => NaverMapInstance
     LatLng: new (latitude: number, longitude: number) => unknown
-    LatLngBounds: new (southWest: unknown, northEast: unknown) => unknown
     Point: new (x: number, y: number) => unknown
     InfoWindow: new (
       options: Record<string, unknown>,
