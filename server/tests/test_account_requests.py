@@ -1,6 +1,7 @@
 import sqlite3
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -94,12 +95,43 @@ class RequestFlowTests(unittest.TestCase):
         self.login_as("root")
         listed = self.client.get("/api/admin/requests", params={"kind": "signup"}).json()
         self.assertEqual([item["username"] for item in listed["items"]], ["park_01"])
-        self.assertEqual(self.client.post("/api/admin/requests/signup/park_01/approve").status_code, 201)
+        issued = self.client.post("/api/admin/requests/signup/park_01/approve")
+        self.assertEqual(issued.status_code, 200)
+        self.assertEqual(issued.json()["expiresInHours"], 24)
+        # 코드를 발급해도 사용자가 입력하기 전에는 계정이 없습니다.
+        self.assertIsNone(self.accounts.get("park_01"))
 
         self.logged_out()
+        self.assertEqual(self.client.post("/api/auth/signup/confirm", json={
+            "username": "park_01", "code": "WRONG-CODE1"}).status_code, 400)
+        self.assertIsNone(self.accounts.get("park_01"))
+        self.assertEqual(self.client.post("/api/auth/signup/confirm", json={
+            "username": "park_01", "code": issued.json()["code"]}).status_code, 201)
         self.assertEqual(self.client.post("/api/admin/login", json={
             "username": "park_01", "password": PASSWORD}).status_code, 200)
         self.assertEqual(self.accounts.get("park_01").role, "user")
+
+    def test_signup_code_works_once_and_not_after_expiry(self):
+        self.requests.add_signup("lee_02", hash_password(PASSWORD))
+        code = self.requests.issue_signup_code("lee_02")
+        with patch("app.services.account_requests.time.time", return_value=time.time() + 86401):
+            self.assertIsNone(self.requests.take_signup_with_code("lee_02", code))
+        self.assertIsNotNone(self.requests.take_signup_with_code("lee_02", code))
+        self.assertIsNone(self.requests.take_signup_with_code("lee_02", code))
+
+    def test_signup_confirm_without_code_issued_fails(self):
+        self.logged_out()
+        self.client.post("/api/auth/signup", json={"username": "lee_02", "password": PASSWORD})
+        self.assertEqual(self.client.post("/api/auth/signup/confirm", json={
+            "username": "lee_02", "code": "ABCDE-FGHJK"}).status_code, 400)
+        self.assertIsNone(self.accounts.get("lee_02"))
+
+    def test_reissuing_signup_code_invalidates_the_old_one(self):
+        self.requests.add_signup("lee_02", hash_password(PASSWORD))
+        old = self.requests.issue_signup_code("lee_02")
+        new = self.requests.issue_signup_code("lee_02")
+        self.assertIsNone(self.requests.take_signup_with_code("lee_02", old))
+        self.assertIsNotNone(self.requests.take_signup_with_code("lee_02", new))
 
     def test_signup_rejects_existing_and_duplicate_pending_names(self):
         self.logged_out()
@@ -110,14 +142,10 @@ class RequestFlowTests(unittest.TestCase):
         self.assertEqual(self.client.post("/api/auth/signup", json={
             "username": "lee_02", "password": PASSWORD}).status_code, 409)
 
-    def test_approving_twice_or_after_reject_is_not_found(self):
+    def test_issuing_code_after_reject_is_not_found(self):
         self.logged_out()
-        self.client.post("/api/auth/signup", json={"username": "lee_02", "password": PASSWORD})
-        self.login_as("root")
-        self.assertEqual(self.client.post("/api/admin/requests/signup/lee_02/approve").status_code, 201)
-        self.assertEqual(self.client.post("/api/admin/requests/signup/lee_02/approve").status_code, 404)
-
         self.client.post("/api/auth/signup", json={"username": "choi_03", "password": PASSWORD})
+        self.login_as("root")
         self.assertEqual(self.client.post("/api/admin/requests/signup/choi_03/reject").status_code, 200)
         self.assertEqual(self.client.post("/api/admin/requests/signup/choi_03/approve").status_code, 404)
         self.assertIsNone(self.accounts.get("choi_03"))
@@ -158,8 +186,10 @@ class RequestFlowTests(unittest.TestCase):
         self.logged_out()
         self.client.post("/api/auth/signup", json={"username": "Lee_88", "password": PASSWORD})
         self.login_as("root")
-        self.assertEqual(self.client.post("/api/admin/requests/signup/LEE_88/approve").status_code, 201)
+        code = self.client.post("/api/admin/requests/signup/LEE_88/approve").json()["code"]
         self.logged_out()
+        self.assertEqual(self.client.post("/api/auth/signup/confirm", json={
+            "username": "LEE_88", "code": code}).status_code, 201)
         self.assertEqual(self.client.post("/api/admin/login", json={
             "username": "LEE_88", "password": PASSWORD}).status_code, 200)
         self.assertIsNotNone(self.accounts.get("lee_88"))

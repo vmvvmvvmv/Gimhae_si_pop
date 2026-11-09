@@ -191,6 +191,8 @@ const AUDIT_LABELS: Record<string, string> = {
   user_deactivate: '계정 비활성화',
   user_password_reset: '비밀번호 재설정(관리자)',
   signup_approve: '가입 승인',
+  signup_code_issue: '가입 코드 발급',
+  signup_completed: '가입 완료',
   signup_reject: '가입 거절',
   reset_code_issue: '재설정 코드 발급',
   reset_reject: '재설정 거절',
@@ -294,7 +296,7 @@ function RequestsPanel({ kind, title }: { kind: 'signup' | 'reset'; title: strin
       `${kind}/${encodeURIComponent(item.username)}/approve`,
       '승인하지 못했습니다.',
     )
-    if (response && kind === 'reset') {
+    if (response) {
       const body = await response.json() as { code: string }
       setIssued({ username: item.username, code: body.code })
     }
@@ -306,12 +308,12 @@ function RequestsPanel({ kind, title }: { kind: 'signup' | 'reset'; title: strin
   return (
     <section>
       <h2>{title}</h2>
-      {kind === 'signup' && <p>승인하면 일반 사용자 계정이 만들어지고, 그 아이디로 로그인할 수 있습니다.</p>}
+      {kind === 'signup' && <p>코드를 발급하면 화면에 한 번만 나옵니다. 사용자에게 직접 전달하세요(24시간 유효). 사용자가 코드를 입력해야 계정이 만들어집니다.</p>}
       {kind === 'reset' && <p>승인하면 일회용 코드가 화면에 한 번만 나옵니다. 사용자에게 직접 전달하세요(30분 유효).</p>}
       {error && <p role="alert">{error}</p>}
       {issued && (
         <div role="status">
-          <p>{issued.username}의 재설정 코드: <strong>{issued.code}</strong></p>
+          <p>{issued.username}의 {kind === 'signup' ? '가입' : '재설정'} 코드: <strong>{issued.code}</strong></p>
           <button type="button" onClick={() => setIssued(null)}>확인했습니다(화면에서 지우기)</button>
         </div>
       )}
@@ -320,9 +322,9 @@ function RequestsPanel({ kind, title }: { kind: 'signup' | 'reset'; title: strin
         {items.map((item) => (
           <li key={item.username}>
             {item.username} · 신청 {new Date(item.createdAt * 1000).toLocaleString('ko-KR')}
-            {kind === 'reset' && item.codeIssued && ' · 코드 발급됨(재승인하면 새 코드)'}{' '}
+            {item.codeIssued && ' · 코드 발급됨(다시 누르면 새 코드)'}{' '}
             <button type="button" onClick={() => void approve(item)}>
-              {kind === 'signup' ? '승인' : '코드 발급'}
+              코드 발급
             </button>{' '}
             <button type="button" onClick={() => reject(item)}>거절</button>
           </li>

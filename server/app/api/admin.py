@@ -242,21 +242,20 @@ def list_requests(
     return {"items": [_request_json(item) for item in ACCOUNT_REQUESTS.list(kind)]}
 
 
-@router.post("/requests/signup/{username}/approve", status_code=status.HTTP_201_CREATED)
+@router.post("/requests/signup/{username}/approve")
 def approve_signup(
     username: str,
     request: Request,
     admin: AdminSession = Depends(require_admin),
 ) -> dict[str, object]:
-    password_hash = ACCOUNT_REQUESTS.take_signup(username)
-    if password_hash is None:
+    """가입 코드를 발급합니다. 사용자가 이 코드를 입력해야 계정이 만들어집니다."""
+    if ACCOUNT_STORE.get(username) is not None:
+        raise HTTPException(status_code=409, detail="이미 사용 중인 아이디입니다.")
+    code = ACCOUNT_REQUESTS.issue_signup_code(username)
+    if code is None:
         raise HTTPException(status_code=404, detail="대기 중인 가입 신청을 찾을 수 없습니다.")
-    try:
-        ACCOUNT_STORE.create(username, password_hash, "user")
-    except sqlite3.IntegrityError as error:
-        raise HTTPException(status_code=409, detail="이미 사용 중인 아이디입니다.") from error
-    _audit(request, admin, "signup_approve", normalize_username(username))
-    return _account_json(ACCOUNT_STORE.get(username))
+    _audit(request, admin, "signup_code_issue", normalize_username(username))
+    return {"username": username, "code": code, "expiresInHours": 24}
 
 
 @router.post("/requests/signup/{username}/reject")

@@ -1,7 +1,6 @@
 import logging
 import mimetypes
 from pathlib import Path
-from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +16,7 @@ from .api.floating_population import router as floating_population_router
 from .api.development import router as development_router
 from .api.admin import router as admin_router
 from .api.auth import router as auth_router
-from .core.config import CORS_ORIGINS, ENABLE_API_DOCS, MOIS_SERVICE_KEY, VWORLD_API_KEY
+from .core.config import CORS_ORIGINS, ENABLE_API_DOCS
 from .db import get_db
 from .services.deployment_service import read_deployment_readiness
 from .services.security_headers import apply_security_headers
@@ -81,12 +80,9 @@ app.include_router(auth_router)
 
 
 @app.get("/api/health")
-def health() -> dict[str, Any]:
-    return {
-        "status": "ok",
-        "mois_key_configured": bool(MOIS_SERVICE_KEY),
-        "vworld_key_configured": bool(VWORLD_API_KEY),
-    }
+def health() -> dict[str, str]:
+    # 공개 주소이므로 서버 설정 상태는 응답에 넣지 않습니다.
+    return {"status": "ok"}
 
 
 @app.get("/api/ready")
@@ -112,12 +108,16 @@ INDEX_CACHE_CONTROL = "no-cache"
 ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable"
 
 
-@app.get("/{requested_path:path}", include_in_schema=False)
+@app.api_route("/{requested_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
 def serve_frontend(requested_path: str):
     if requested_path == "api" or requested_path.startswith("api/"):
         raise HTTPException(status_code=404)
     # docs/ 는 내부 기획·배포 문서입니다. 웹으로는 어떤 경로도 열지 않습니다.
     if requested_path == "docs" or requested_path.startswith("docs/"):
+        raise HTTPException(status_code=404)
+
+    # .env, .git 같은 숨김 경로는 화면 대신 404로 답합니다.
+    if any(part.startswith(".") for part in requested_path.split("/")):
         raise HTTPException(status_code=404)
 
     file_path = (FRONTEND_DIR / requested_path).resolve()

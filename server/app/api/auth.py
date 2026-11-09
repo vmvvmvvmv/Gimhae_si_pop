@@ -41,6 +41,11 @@ class SignupRequest(BaseModel):
     password: str = Field(min_length=10, max_length=200)
 
 
+class SignupConfirmRequest(BaseModel):
+    username: str = Field(pattern=USERNAME_PATTERN)
+    code: str = Field(min_length=8, max_length=20)
+
+
 class ResetRequest(BaseModel):
     username: str = Field(pattern=USERNAME_PATTERN)
 
@@ -87,7 +92,7 @@ def _reject_if_limited(retry_after: int) -> None:
 
 @router.post("/signup", status_code=status.HTTP_202_ACCEPTED)
 def signup(payload: SignupRequest, request: Request) -> dict[str, str]:
-    """가입 신청만 받습니다. 관리자가 승인하기 전에는 로그인할 수 없습니다."""
+    """가입 신청만 받습니다. 관리자가 발급한 코드를 입력해야 계정이 만들어집니다."""
     _rate_limit(request, payload.username)
     if ACCOUNT_STORE.get(payload.username) is not None:
         raise HTTPException(status_code=409, detail="이미 사용 중인 아이디입니다.")
@@ -96,6 +101,24 @@ def signup(payload: SignupRequest, request: Request) -> dict[str, str]:
     except sqlite3.IntegrityError as error:
         raise HTTPException(status_code=409, detail="이미 가입 신청이 접수되어 있습니다.") from error
     return {"status": "pending"}
+
+
+@router.post("/signup/confirm", status_code=status.HTTP_201_CREATED)
+def confirm_signup(payload: SignupConfirmRequest, request: Request) -> dict[str, str]:
+    """관리자가 발급한 코드를 확인하고 신청 때 받은 비밀번호로 계정을 만듭니다."""
+    _rate_limit(request, payload.username)
+    password_hash = ACCOUNT_REQUESTS.take_signup_with_code(payload.username, payload.code)
+    if password_hash is None:
+        raise HTTPException(status_code=400, detail="코드가 올바르지 않거나 만료되었습니다.")
+    try:
+        ACCOUNT_STORE.create(payload.username, password_hash, "user")
+    except sqlite3.IntegrityError as error:
+        raise HTTPException(status_code=409, detail="이미 사용 중인 아이디입니다.") from error
+    audit_log.record(
+        normalize_username(payload.username), "signup_completed",
+        ip=request.client.host if request.client else "unknown",
+    )
+    return {"status": "ok"}
 
 
 @router.post("/password-reset/request", status_code=status.HTTP_202_ACCEPTED)
