@@ -1,4 +1,5 @@
 import logging
+import mimetypes
 from pathlib import Path
 from typing import Any
 
@@ -102,6 +103,8 @@ def ready(db: Session = Depends(get_db)) -> JSONResponse:
 
 
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "dist"
+# 형식을 지정해야 Nginx가 지도 GeoJSON을 압축합니다.
+mimetypes.add_type("application/geo+json", ".geojson")
 
 # index.html은 배포마다 새 번들 이름을 가리키므로 매번 서버에 확인하게 합니다.
 # assets/ 아래 파일은 이름에 내용 해시가 붙어 바뀌지 않으므로 오래 캐시합니다.

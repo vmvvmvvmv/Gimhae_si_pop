@@ -47,38 +47,21 @@ export function getBoundaryProperties(feature: NaverFeature): Record<string, unk
   }
 }
 
+// 네이버 Data 레이어는 선 도형을 구간마다 별도 SVG로 그려서, 경계를 선으로 올리면 이동·확대가 느려집니다.
+// 면 도형은 하나의 SVG로 그려지므로 채우기만 투명하게 한 면으로 경계선을 표시합니다.
 export function createBoundaryOutlines(
   boundary: GeoJsonCollection,
 ): GeoJsonCollection {
   return {
     type: 'FeatureCollection',
     name: `${boundary.name ?? 'boundary'} outlines`,
-    features: boundary.features.flatMap((feature, featureIndex) => {
-      const { geometry } = feature
-      let lineCoordinates: unknown
-
-      if (geometry.type === 'Polygon') {
-        lineCoordinates = geometry.coordinates
-      } else if (geometry.type === 'MultiPolygon') {
-        lineCoordinates = (geometry.coordinates as unknown[]).flat()
-      } else {
-        return []
-      }
-
-      return [
-        {
-          type: 'Feature' as const,
-          properties: {
-            __layer: 'boundary-outline',
-            __sourceFeatureIndex: featureIndex,
-          },
-          geometry: {
-            type: 'MultiLineString',
-            coordinates: lineCoordinates,
-          },
-        },
-      ]
-    }),
+    features: boundary.features
+      .filter(({ geometry }) => geometry.type === 'Polygon' || geometry.type === 'MultiPolygon')
+      .map((feature) => ({
+        type: 'Feature' as const,
+        properties: { __layer: 'boundary-outline' },
+        geometry: feature.geometry,
+      })),
   }
 }
 
@@ -155,6 +138,7 @@ export function applyPopulationStyles(
 
     if (feature.getProperty('__layer') === 'boundary-outline') {
       return {
+        fillOpacity: 0,
         strokeColor: BOUNDARY_STROKE_COLOR,
         strokeOpacity: 1,
         strokeWeight: 1.8,

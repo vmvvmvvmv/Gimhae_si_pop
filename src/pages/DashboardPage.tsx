@@ -216,7 +216,7 @@ export default function DashboardPage() {
     legalBoundaryQuery,
     administrativeExportRegions,
     exportRegionOptions,
-  } = useRegionBoundaries(boundaryType)
+  } = useRegionBoundaries(boundaryType, searchTerm.trim().length > 0 || selectedRegion != null)
 
   const {
     developmentAreasQuery,

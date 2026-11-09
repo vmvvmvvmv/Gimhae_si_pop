@@ -307,6 +307,7 @@ export default function NaverMap({
   useEffect(() => {
     let cancelled = false
     let tourResizeObserver: ResizeObserver | null = null
+    let tourStartObserver: MutationObserver | null = null
     const facilityMarkers = facilityMarkersRef.current
 
     async function initializeMap() {
@@ -357,7 +358,8 @@ export default function NaverMap({
         trafficLayerRef.current = new window.naver.maps.TrafficLayer()
 
         const updateTourRegion = () => {
-          if (!mapElement.current) return
+          // 튜토리얼의 지역 선택 단계에서만 필요하므로 평소 지도 이동에는 계산하지 않습니다.
+          if (!mapElement.current || document.body.dataset.mapTourActive !== 'true') return
           const projection = map.getProjection()
           const target = getRegionTourBounds(
             boundary.features,
@@ -374,6 +376,11 @@ export default function NaverMap({
           tourResizeObserver = new ResizeObserver(updateTourRegion)
           tourResizeObserver.observe(mapElement.current)
         }
+        tourStartObserver = new MutationObserver(updateTourRegion)
+        tourStartObserver.observe(document.body, {
+          attributes: true,
+          attributeFilter: ['data-map-tour-active'],
+        })
         updateTourRegion()
 
         dataLayer.addGeoJson({
@@ -558,6 +565,7 @@ export default function NaverMap({
     return () => {
       cancelled = true
       tourResizeObserver?.disconnect()
+      tourStartObserver?.disconnect()
       if (mapRef.current) window.naver?.maps?.Event.clearInstanceListeners(mapRef.current)
       trafficLayerRef.current?.setMap(null)
       trafficLayerRef.current = null
